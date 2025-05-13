@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Head-to-Head Snake - Online</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>Head-to-Head Snake</h1>
+
+    <div id="status" class="status-message">Connecting to server...</div>
+
+    <div id="countdownDisplay" class="countdown-overlay" style="display: none;"></div>
+
+    <div class="game-container">
+        <!-- Player 1 Area -->
+        <div class="player-area" id="player-area-1">
+            <h2>
+                Player 1
+                (<span id="p1-status" class="player-status">Waiting</span>)
+                <span id="you-p1" class="you-indicator">(You)</span>
+            </h2>
+            <canvas id="gameCanvas1" width="400" height="400"></canvas>
+            <div class="score">Score: <span id="score1">0</span></div>
+        </div>
+
+        <!-- Player 2 Area -->
+        <div class="player-area" id="player-area-2">
+             <h2>
+                Player 2
+                (<span id="p2-status" class="player-status">Waiting</span>)
+                <span id="you-p2" class="you-indicator">(You)</span>
+            </h2>
+            <canvas id="gameCanvas2" width="400" height="400"></canvas>
+            <div class="score">Score: <span id="score2">0</span></div>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <button id="restartButton" style="display: none;">Request Restart</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,218 @@
+/* --- CSS Variables --- */
+:root {
+    --primary-bg: #1a1a2e;
+    --secondary-bg: #16213e;
+    --card-bg: #0f3460;
+    --text-color: #e94560;
+    --text-light: #f0f0f0;
+    --accent-color: #53a8b6;
+    --border-color: #53a8b6;
+    --win-color: #76c893;
+    --lose-color: #e76f51;
+    --waiting-color: #fcca46;
+    --canvas-bg: #2c3e50;
+    --font-primary: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-accent: 'Orbitron', sans-serif;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+body {
+    font-family: var(--font-primary);
+    background-color: var(--primary-bg);
+    color: var(--text-light);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    box-sizing: border-box;
+    opacity: 0;
+    animation: fadeInPage 0.8s ease-out forwards;
+}
+
+@keyframes fadeInPage { to { opacity: 1; } }
+
+h1 {
+    font-family: var(--font-accent), var(--font-primary);
+    color: var(--text-color);
+    font-size: 2.8em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    text-align: center;
+}
+
+h2 {
+    font-family: var(--font-accent), var(--font-primary);
+    color: var(--accent-color);
+    font-size: 1.5em;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.status-message {
+    background-color: var(--secondary-bg);
+    color: var(--text-light);
+    padding: 10px 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    font-size: 1.1em;
+    min-width: 300px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.status-message.pulsing {
+    animation: pulseStatus 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseStatus {
+    0%, 100% { background-color: var(--secondary-bg); transform: scale(1); }
+    50% { background-color: var(--accent-color); color: var(--primary-bg); transform: scale(1.03); }
+}
+
+.game-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
+    width: 100%;
+    max-width: 1000px;
+}
+
+.player-area {
+    background-color: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    text-align: center;
+    border: 2px solid transparent;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+    flex: 1;
+    min-width: 380px;
+    max-width: 450px;
+}
+
+canvas {
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--canvas-bg);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+    display: block;
+    margin: 0 auto 15px auto;
+}
+
+.score {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--text-light);
+}
+
+.score span {
+    color: var(--accent-color);
+    font-family: var(--font-accent), var(--font-primary);
+    min-width: 40px;
+    display: inline-block;
+}
+
+.you-indicator {
+    display: none;
+    color: var(--text-color);
+    font-weight: bold;
+    margin-left: 8px;
+    animation: glowYouIndicator 2s infinite alternate ease-in-out;
+}
+
+@keyframes glowYouIndicator {
+    from { text-shadow: 0 0 3px var(--text-color), 0 0 6px var(--text-color); opacity: 0.8; }
+    to { text-shadow: 0 0 6px var(--text-color), 0 0 12px var(--text-color), 0 0 18px var(--accent-color); opacity: 1; }
+}
+
+.player-status {
+    font-style: italic;
+    font-size: 0.8em;
+    transition: color 0.3s ease;
+}
+.player-status.playing { color: var(--accent-color); }
+.player-status.winner { color: var(--win-color); font-weight: bold; }
+.player-status.lost { color: var(--lose-color); }
+.player-status.waiting { color: var(--waiting-color); }
+.player-status.disconnected { color: #aaa; }
+.player-status.draw { color: var(--text-light); }
+
+/* --- Countdown Overlay --- */
+.countdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(26, 26, 46, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    font-size: 12vw; /* Increased for impact */
+    font-family: var(--font-accent), var(--font-primary);
+    color: var(--text-color);
+    text-shadow: 0 0 20px rgba(233, 69, 96, 0.8); /* Enhanced shadow */
+    font-weight: bold;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    pointer-events: none; /* Allow clicks through if needed, though it covers all */
+}
+.countdown-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* --- Controls Area & Restart Button --- */
+.controls-area {
+    margin-top: 25px;
+    text-align: center;
+}
+#restartButton {
+    background-color: var(--accent-color);
+    color: var(--primary-bg);
+    border: none;
+    padding: 12px 25px;
+    font-size: 1.1em;
+    font-family: var(--font-primary);
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+#restartButton:hover {
+    background-color: #4798a5;
+    transform: translateY(-2px);
+}
+#restartButton:active { transform: translateY(0px); }
+#restartButton:disabled {
+    background-color: #555;
+    color: #999;
+    cursor: not-allowed;
+    transform: translateY(0px);
+    opacity: 0.7;
+}
+
+@media (max-width: 850px) {
+    .game-container { flex-direction: column; align-items: center; }
+    .player-area { width: 90%; max-width: 450px; min-width: auto; }
+    h1 { font-size: 2.2em; }
+    .countdown-overlay { font-size: 15vw; }
+}
+@media (max-width: 480px) {
+    body { padding: 10px; }
+    h1 { font-size: 1.8em; }
+    h2 { font-size: 1.3em; }
+    .status-message { font-size: 1em; min-width: auto; width: 90%; }
+    .player-area { padding: 15px; }
+    .countdown-overlay { font-size: 20vw; }
+    #restartButton { padding: 10px 20px; font-size: 1em; }
+}
