@@ -7,6 +7,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const mongoose = require('mongoose');
+const Filter = require('bad-words');
+const filter = new Filter();
 
 const app = express();
 const server = http.createServer(app);
@@ -276,6 +278,35 @@ io.on('connection', (socket) => {
             (newDirection === 'RIGHT' && currentDir !== 'LEFT')
         ) { board.direction = newDirection; }
     });
+
+    socket.on('joinGame', (data) => {
+        const playerName = data.name ? data.name.trim() : '';
+    
+        if (!playerName || playerName.length < 2 || playerName.length > 15) {
+            socket.emit('nameRejected', { message: 'Name must be between 2 and 15 characters.' });
+            return;
+        }
+        if (!/^[a-zA-Z0-9_-\s]+$/.test(playerName) || playerName.trim() === '') {
+             socket.emit('nameRejected', { message: 'Name contains invalid characters.' });
+             return;
+        }
+    
+        try {
+            if (filter.isProfane(playerName)) {
+                console.log(`Name rejected by filter for ${socket.id}: ${playerName}`);
+                socket.emit('nameRejected', { message: 'The name you chose contains inappropriate language. Please pick another.' });
+                return;
+            }
+        } catch (e) {
+            // Some filters might throw an error on empty strings or weird inputs
+            console.error("Profanity filter error:", e);
+            socket.emit('nameRejected', { message: 'This name can not be used on the server. Please try again.' });
+            return;
+        }
+
+        console.log(`Player ${socket.id} chose name: ${playerName}`);
+    });
+    
 
     socket.on('requestRestart', () => {
         if (!players[socket.id]) return;
