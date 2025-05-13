@@ -17,22 +17,196 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
 
+/* ... (existing CSS Variables and @import) ... */
+
 body {
+    /* font-family, background-color, color, margin, min-height, box-sizing, opacity, animation (same) */
     font-family: var(--font-primary);
     background-color: var(--primary-bg);
     color: var(--text-light);
-    margin: 0;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    margin: 0; /* Remove default body margin */
     min-height: 100vh;
     box-sizing: border-box;
     opacity: 0;
     animation: fadeInPage 0.8s ease-out forwards;
+    display: flex; /* Make body a flex container for page-container */
 }
 
 @keyframes fadeInPage { to { opacity: 1; } }
+
+/* --- Main Page Container for Sidebar Layout --- */
+.page-container {
+    display: flex;
+    width: 100%;
+    height: 100vh; /* Make it full viewport height */
+    overflow: hidden; /* Prevent body scrollbars if content exceeds */
+}
+
+/* --- Leaderboard Sidebar --- */
+.leaderboard-sidebar {
+    width: 280px; /* Fixed width for the sidebar */
+    min-width: 250px; /* Minimum width */
+    background-color: var(--secondary-bg);
+    padding: 20px;
+    box-sizing: border-box;
+    border-right: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Full height of parent */
+    overflow-y: auto; /* Scrollbar if content exceeds height */
+}
+
+.leaderboard-sidebar h2 {
+    font-family: var(--font-accent), var(--font-primary);
+    color: var(--text-color);
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.6em;
+}
+
+#leaderboardList {
+    list-style-type: decimal;
+    padding-left: 20px; /* Adjust indent */
+    margin: 0; /* Reset default ol margin */
+    flex-grow: 1; /* Allow list to take available space */
+    overflow-y: auto; /* Scroll if list is too long for its allocated space */
+}
+
+#leaderboardList li {
+    padding: 7px 0px; /* Adjust padding */
+    border-bottom: 1px solid var(--card-bg);
+    font-size: 1em; /* Adjust font size */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-light);
+}
+#leaderboardList li:last-child {
+    border-bottom: none;
+}
+#leaderboardList .leaderboard-name {
+    /* color is var(--text-light) from parent li */
+    font-weight: normal;
+    overflow: hidden; /* Prevent long names from breaking layout */
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 10px;
+}
+#leaderboardList .leaderboard-score {
+    color: var(--accent-color);
+    font-weight: bold;
+    flex-shrink: 0; /* Prevent score from shrinking */
+}
+
+.sidebar-button { /* For Refresh button */
+    background-color: var(--accent-color);
+    color: var(--primary-bg);
+    border: none;
+    padding: 8px 15px;
+    font-size: 0.9em;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-top: 15px; /* Space above button */
+    width: 100%;
+}
+.sidebar-button:hover {
+    background-color: #4798a5;
+}
+
+
+/* --- Main Game Content Area --- */
+.main-content {
+    flex-grow: 1; /* Takes up remaining space */
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto; /* Scrollbar if content exceeds viewport height */
+    height: 100%;
+}
+
+/* Adjust h1 for main content area if needed */
+.main-content h1 {
+    font-family: var(--font-accent), var(--font-primary);
+    color: var(--text-color);
+    font-size: 2.5em; /* Slightly smaller if space is reduced */
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    text-align: center;
+}
+
+.status-message { /* Adjust margins if needed */
+    margin-bottom: 20px;
+}
+
+/*.game-container { /* Keep existing styles, ensure it centers */
+    /* display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; width: 100%; max-width: 1000px; */
+    /* No major change needed here unless it conflicts 
+}
+
+/*.player-area { /* May need slight max-width adjustment if game area is squeezed */
+    /* background-color, padding, border-radius, etc (same) */
+    /* min-width: 380px; max-width: 420px; /* Adjust if needed 
+}*/
+
+.controls-area { /* Keep existing styles */
+    margin-top: 20px;
+}
+
+
+/* --- Modal Overlays (Name input, Countdown) --- */
+/* Keep existing .modal-overlay, .modal-content, countdown-overlay styles */
+/* Ensure they still work correctly centered within .main-content or viewport */
+.modal-overlay {
+    position: fixed; /* Fixed to viewport still works best */
+    /* ... (rest of existing modal-overlay styles) ... */
+}
+
+.countdown-overlay {
+    position: fixed; /* Fixed to viewport */
+    /* ... (rest of existing countdown-overlay styles) ... */
+}
+
+
+/* --- Responsive Adjustments for Sidebar --- */
+@media (max-width: 1024px) { /* Breakpoint when sidebar might be too wide */
+    .leaderboard-sidebar {
+        width: 220px; /* Slightly narrower sidebar */
+        min-width: 200px;
+        padding: 15px;
+    }
+    .leaderboard-sidebar h2 { font-size: 1.4em; }
+    #leaderboardList li { font-size: 0.95em; }
+    .sidebar-button { font-size: 0.85em; padding: 7px 12px;}
+}
+
+@media (max-width: 768px) { /* Stack layout: Sidebar on top, then main content */
+    .page-container {
+        flex-direction: column;
+        height: auto; /* Allow page to scroll */
+        overflow: visible;
+    }
+    .leaderboard-sidebar {
+        width: 100%; /* Full width */
+        height: auto; /* Adjust height to content, maybe max-height */
+        max-height: 40vh; /* Example: Limit height, make it scrollable */
+        border-right: none;
+        border-bottom: 2px solid var(--border-color);
+        order: -1; /* Move sidebar to the top */
+    }
+   
+    .main-content {
+        height: auto; /* Allow content to determine height */
+        padding: 15px; /* Reduce padding on smaller screens */
+    }
+    .main-content h1 { font-size: 2em; }
+    .game-container { gap: 20px; }
+    .player-area { min-width: 300px; max-width: 380px; } /* Adjust game areas */
+}
 
 h1 {
     font-family: var(--font-accent), var(--font-primary);

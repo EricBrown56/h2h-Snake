@@ -39,11 +39,164 @@ document.addEventListener('DOMContentLoaded', () => {
     nameStatusMessage = document.getElementById('nameStatusMessage');
 
     // Leaderboard elements
-    showLeaderboardButton = document.getElementById('showLeaderboardButton');
-    leaderboardModal = document.getElementById('leaderboardModal');
     leaderboardList = document.getElementById('leaderboardList');
-    closeLeaderboardButton = document.getElementById('closeLeaderboardButton');
+   
+    // ... (keep existing global variables: socket, canvases, UI elements) ...
+// Remove: showLeaderboardButton, leaderboardModal, closeLeaderboardButton from being top-level vars if only used locally
+// Add:
+let refreshLeaderboardButton;
 
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (get existing elements) ...
+    p1NameDisplay = document.getElementById('p1-name-display');
+    p2NameDisplay = document.getElementById('p2-name-display');
+
+    // Player Name Modal elements (same)
+    playerNameModal = document.getElementById('playerNameModal');
+    playerNameInput = document.getElementById('playerNameInput');
+    submitNameButton = document.getElementById('submitNameButton');
+    nameStatusMessage = document.getElementById('nameStatusMessage');
+
+    // Leaderboard elements (sidebar)
+    leaderboardList = document.getElementById('leaderboardList'); // This is now the <ol> in the sidebar
+    refreshLeaderboardButton = document.getElementById('refreshLeaderboardButton');
+
+    // ... (initial status, restart button listener, submit name listener - same) ...
+
+    if (refreshLeaderboardButton) {
+        refreshLeaderboardButton.addEventListener('click', fetchAndShowLeaderboard);
+    }
+
+    // Close player name modal if overlay is clicked
+    if (playerNameModal) {
+        playerNameModal.addEventListener('click', (event) => {
+            if (event.target === playerNameModal) {
+                playerNameModal.classList.remove('visible');
+            }
+        });
+    }
+
+    // Initial fetch of leaderboard when page loads
+    fetchAndShowLeaderboard();
+
+    // Setup keyboard listener (same)
+    document.addEventListener('keydown', handleKeyPress);
+});
+
+// --- Utility Functions (updateStatus, updatePlayerStatusAndClass, clearCanvas, handleRestartRequest - same) ---
+// --- Player Name Functions (showPlayerNameModal, handleSubmitPlayerName - same) ---
+
+// --- Leaderboard Functions ---
+async function fetchAndShowLeaderboard() {
+    if (!leaderboardList) return;
+    leaderboardList.innerHTML = '<li>Refreshing...</li>'; // Show loading/refreshing
+
+    try {
+        const response = await fetch('/api/leaderboard');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const scores = await response.json();
+        renderLeaderboard(scores);
+    } catch (error) {
+        console.error("Failed to fetch leaderboard:", error);
+        if(leaderboardList) leaderboardList.innerHTML = '<li>Error loading scores. Please try again.</li>';
+    }
+}
+
+function renderLeaderboard(scores) { // This function remains the same as it populates the <ol>
+    if (!leaderboardList) return;
+    leaderboardList.innerHTML = '';
+
+    if (scores.length === 0) {
+        leaderboardList.innerHTML = '<li>No scores yet. Be the first!</li>';
+        return;
+    }
+
+    scores.forEach(scoreEntry => {
+        const li = document.createElement('li');
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'leaderboard-name';
+        nameSpan.textContent = scoreEntry.playerName;
+
+        const scoreSpan = document.createElement('span');
+        scoreSpan.className = 'leaderboard-score';
+        scoreSpan.textContent = scoreEntry.score;
+
+        li.appendChild(nameSpan);
+        li.appendChild(scoreSpan);
+        leaderboardList.appendChild(li);
+    });
+}
+
+
+// --- Socket Event Handlers ---
+// socket.on('connect', ...) - same
+// socket.on('disconnect', ...) - same, ensure modals are hidden if open
+// socket.on('init', ...) - same
+// socket.on('nameAccepted', ...) - same
+// socket.on('nameInvalid', ...) - same
+// socket.on('waiting', ...) - same
+// socket.on('countdownUpdate', ...) - same
+// socket.on('opponentNameUpdate', ...) - same
+// socket.on('gameState', ...) - same
+
+socket.on('gameOver', (data) => {
+    // ... (existing gameOver logic for messages, player statuses, enabling restartButton) ...
+    gameActiveForInput = false;
+    if (countdownDisplayDiv) countdownDisplayDiv.classList.remove('visible');
+    let message = "Game Over! ";
+
+    const winnerName = currentBoardsState[data.winnerId]?.playerName || `Player ${data.winnerId}`;
+    const loserId = data.winnerId === 1 ? 2 : 1;
+
+    if (data.reason === 'opponentLeft') {
+        message = `${winnerName} wins! (Opponent disconnected)`;
+        updatePlayerStatusAndClass(data.winnerId, "Winner!", "winner");
+        updatePlayerStatusAndClass(loserId, "Disconnected", "disconnected");
+    } else if (data.winnerId === 0) {
+        message += "It's a draw!";
+        updatePlayerStatusAndClass(1, "Draw", "draw");
+        updatePlayerStatusAndClass(2, "Draw", "draw");
+    } else {
+        message += `${winnerName} wins!`;
+        updatePlayerStatusAndClass(data.winnerId, "Winner!", "winner");
+        updatePlayerStatusAndClass(loserId, "Lost", "lost");
+    }
+    updateStatus(message);
+
+    if (restartButton) {
+        restartButton.style.display = 'block';
+        restartButton.disabled = false;
+        restartButton.textContent = 'Request Restart';
+    }
+
+    if (currentBoardsState) {
+        if(currentBoardsState[1]) currentBoardsState[1].isGameOver = (data.winnerId === 2 || data.winnerId === 0 || (data.reason === 'opponentLeft' && data.winnerId === 2));
+        if(currentBoardsState[2]) currentBoardsState[2].isGameOver = (data.winnerId === 1 || data.winnerId === 0 || (data.reason === 'opponentLeft' && data.winnerId === 1));
+        drawGame();
+    }
+
+    // Fetch and update leaderboard after a game ends
+    fetchAndShowLeaderboard(); // <-- ADD THIS
+
+    // Prompt for name if not set, AFTER updating leaderboard
+    setTimeout(() => {
+        const currentName = (myPlayerId === 1 && p1NameDisplay) ? p1NameDisplay.textContent : ( (myPlayerId === 2 && p2NameDisplay) ? p2NameDisplay.textContent : "");
+        if (!localPlayerName || currentName.startsWith('Player')) {
+            showPlayerNameModal(localPlayerName || (myPlayerId ? `Player${myPlayerId}`: ''));
+        }
+    }, 500); // Slight delay
+});
+
+// socket.on('gameFull', ...) - same
+// socket.on('restartRequestedByYou', ...) - same
+// socket.on('opponentRequestedRestart', ...) - same
+// socket.on('allPlayersReadyForRestart', ...) - same
+
+// --- Drawing Functions (drawGame, drawBoard - same) ---
+// --- Keyboard Input Handler (handleKeyPress - same) ---
     // Initial setup
     updateStatus('Connecting to server...', true);
     if (restartButton) {
