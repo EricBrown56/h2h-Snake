@@ -216,3 +216,127 @@ canvas {
     .countdown-overlay { font-size: 20vw; }
     #restartButton { padding: 10px 20px; font-size: 1em; }
 }
+/* ... (all existing styles) ... */
+
+/* --- Modal Overlay (Generic for Name Input and Leaderboard) --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(26, 26, 46, 0.85); /* Dark semi-transparent */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Ensure it's on top */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    padding: 20px; /* Add padding for smaller screens */
+    box-sizing: border-box;
+}
+
+.modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: var(--secondary-bg);
+    padding: 25px 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    border: 1px solid var(--border-color);
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal-content h2 {
+    color: var(--text-color);
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+.modal-content p {
+    margin-bottom: 20px;
+    color: var(--text-light);
+    line-height: 1.6;
+}
+
+/* --- Player Name Input Specific Styles --- */
+#playerNameInput {
+    width: calc(100% - 22px); /* Full width minus padding/border */
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--primary-bg);
+    color: var(--text-light);
+    font-size: 1em;
+}
+
+#playerNameModal button, #leaderboardModal button {
+    background-color: var(--accent-color);
+    color: var(--primary-bg);
+    border: none;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-top: 10px; /* Add some space if there's a message below */
+}
+
+#playerNameModal button:hover, #leaderboardModal button:hover {
+    background-color: #4798a5;
+}
+
+.name-status {
+    margin-top: 15px;
+    font-size: 0.9em;
+    min-height: 1.2em; /* Prevent layout shift */
+}
+.name-status.success { color: var(--win-color); }
+.name-status.error { color: var(--lose-color); }
+
+
+/* --- Leaderboard Specific Styles --- */
+.leaderboard-content {
+    max-width: 600px;
+}
+#leaderboardList {
+    list-style-type: decimal;
+    padding-left: 30px; /* Indent numbers */
+    text-align: left;
+    max-height: 60vh; /* Prevent very long leaderboards from overflowing */
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+#leaderboardList li {
+    padding: 8px 5px;
+    border-bottom: 1px solid var(--card-bg);
+    font-size: 1.1em;
+    display: flex;
+    justify-content: space-between;
+}
+#leaderboardList li:last-child {
+    border-bottom: none;
+}
+#leaderboardList .leaderboard-name {
+    color: var(--text-light);
+    font-weight: normal;
+}
+#leaderboardList .leaderboard-score {
+    color: var(--accent-color);
+    font-weight: bold;
+}
+
+#leaderboardList .leaderboard-timestamp {
+    font-size: 0.8em;
+    color: #aaa;
+    margin-left: 10px;
+    font-style: italic;
+}
