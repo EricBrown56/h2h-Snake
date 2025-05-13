@@ -7,8 +7,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const mongoose = require('mongoose');
-const Filter = require('bad-words');
-const filter = new Filter();
+// bad-words will be imported dynamically
 
 const app = express();
 const server = http.createServer(app);
@@ -26,7 +25,7 @@ const DEBUFF_SHRINK_AMOUNT = 2;
 const COUNTDOWN_SECONDS = 3;
 
 // --- Game State Variables ---
-let players = {}; // { socketId: { playerId: 1 or 2, color: 'green', name: 'PlayerX' } }
+let players = {}; // { socketId: { playerId, name, color, socketId } }
 let boards = { 1: null, 2: null };
 let playerSockets = { 1: null, 2: null }; // Map playerId to socketId
 
@@ -55,7 +54,8 @@ const scoreSchema = new mongoose.Schema({
 const Score = mongoose.model('Score', scoreSchema);
 
 // --- Utility Functions ---
-function createNewBoardState(playerId) {
+function createNewBoardState(playerId, playerNameFromArg) {
+    const playerName = playerNameFromArg || `Player ${playerId}`;
     const startX = Math.floor(GRID_SIZE / 4);
     const startY = Math.floor(GRID_SIZE / 2);
     const startColor = playerId === 1 ? 'green' : 'blue';
@@ -68,31 +68,30 @@ function createNewBoardState(playerId) {
         score: 0,
         food: getRandomPosition(initialSnake),
         debuffs: [],
-        powerups: [],
+        powerups: [], // You can add power-up logic later
         foodEatenCounter: 0,
         isGameOver: false,
-        playerName: `Player ${playerId}` // Default name included here
+        playerName: playerName
     };
 }
 
 function resetBoardStatesOnly() {
     console.log("Resetting game board states.");
-    boards[1] = createNewBoardState(1);
-    boards[2] = createNewBoardState(2);
+    const p1Name = (playerSockets[1] && players[playerSockets[1]]) ? players[playerSockets[1]].name : `Player 1`;
+    const p2Name = (playerSockets[2] && players[playerSockets[2]]) ? players[playerSockets[2]].name : `Player 2`;
+
+    boards[1] = createNewBoardState(1, p1Name);
+    boards[2] = createNewBoardState(2, p2Name);
     gameActuallyRunning = false;
 
-    // Sync colors and names if players are already assigned and have custom names
     if (playerSockets[1] && players[playerSockets[1]]) {
         boards[1].color = players[playerSockets[1]].color;
-        boards[1].playerName = players[playerSockets[1]].name; // Update with current name
     }
     if (playerSockets[2] && players[playerSockets[2]]) {
         boards[2].color = players[playerSockets[2]].color;
-        boards[2].playerName = players[playerSockets[2]].name; // Update with current name
     }
-    // Ensure food is placed correctly after name/color potentially set
-    boards[1].food = getRandomPosition(boards[1].snake);
-    boards[2].food = getRandomPosition(boards[2].snake);
+    if (boards[1]) boards[1].food = getRandomPosition(boards[1].snake);
+    if (boards[2]) boards[2].food = getRandomPosition(boards[2].snake);
 }
 
 function clearAllIntervalsAndRequests() {
@@ -104,44 +103,50 @@ function clearAllIntervalsAndRequests() {
 
 function getRandomPosition(exclude = []) {
     let position, occupied = true, attempts = 0;
-    while (occupied && attempts < (GRID_SIZE * GRID_SIZE)) {
+    const maxAttempts = GRID_SIZE * GRID_SIZE;
+    while (occupied && attempts < maxAttempts) {
         position = { x: Math.floor(Math.random() * GRID_SIZE), y: Math.floor(Math.random() * GRID_SIZE) };
         occupied = exclude.some(item => item && item.x === position.x && item.y === position.y);
         attempts++;
     }
-    if (occupied) console.error("Could not find empty spot for item!");
+    if (occupied) console.warn("Could not find an empty spot for item after max attempts!");
     return position || { x: 0, y: 0 };
 }
 
-// Function to prepare board data with current player names for emission
 function getBoardsWithPlayerNames() {
-    return {
-        1: boards[1] ? {
-            ...boards[1],
-            playerName: (playerSockets[1] && players[playerSockets[1]]) ? players[playerSockets[1]].name : (boards[1].playerName || 'Player 1')
-        } : null,
-        2: boards[2] ? {
-            ...boards[2],
-            playerName: (playerSockets[2] && players[playerSockets[2]]) ? players[playerSockets[2]].name : (boards[2].playerName || 'Player 2')
-        } : null
-    };
+    const currentBoards = {};
+    if (boards[1]) {
+        currentBoards[1] = { ...boards[1], playerName: (playerSockets[1] && players[playerSockets[1]]) ? players[playerSockets[1]].name : (boards[1].playerName || 'Player 1') };
+    } else {
+        currentBoards[1] = null;
+    }
+    if (boards[2]) {
+        currentBoards[2] = { ...boards[2], playerName: (playerSockets[2] && players[playerSockets[2]]) ? players[playerSockets[2]].name : (boards[2].playerName || 'Player 2') };
+    } else {
+        currentBoards[2] = null;
+    }
+    return currentBoards;
 }
 
 // --- Game Start Sequence ---
 function initiateGameStartSequence() {
-    if (!playerSockets[1] || !playerSockets[2]) {
-        console.log("Cannot start game sequence, not enough players.");
+    if (!playerSockets[1] || !players[playerSockets[1]] || !playerSockets[2] || !players[playerSockets[2]]) {
+        console.log("Cannot start game sequence, not enough players fully joined (with names).");
         return;
     }
     if (gameInterval || countdownInterval) {
-        console.log("Game sequence or game already in progress.");
+        console.log("Game sequence or game already in progress. Aborting new sequence.");
         return;
     }
     console.log("Initiating game start sequence...");
     clearAllIntervalsAndRequests();
-    resetBoardStatesOnly();
 
-    io.emit('gameState', getBoardsWithPlayerNames()); // Send initial state with names
+    boards[1] = createNewBoardState(1, players[playerSockets[1]].name);
+    boards[2] = createNewBoardState(2, players[playerSockets[2]].name);
+    boards[1].color = players[playerSockets[1]].color;
+    boards[2].color = players[playerSockets[2]].color;
+
+    io.emit('gameState', getBoardsWithPlayerNames());
 
     currentCountdown = COUNTDOWN_SECONDS;
     io.emit('countdownUpdate', currentCountdown);
@@ -186,236 +191,252 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
-// --- Socket.IO Connection Handling ---
-io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-    let assignedPlayerId = null;
+// --- Main Server Initialization Function ---
+let filterInstance;
 
-    if (!playerSockets[1]) { assignedPlayerId = 1; }
-    else if (!playerSockets[2]) { assignedPlayerId = 2; }
-    else {
-        socket.emit('gameFull');
-        console.log('Game full, spectator connected or user tried to rejoin:', socket.id);
-        return;
-    }
+async function initializeServer() {
+    try {
+        const badWordsModule = await import('bad-words');
+        const FilterClass = badWordsModule.default;
+        filterInstance = new FilterClass();
+        console.log("Profanity filter initialized.");
 
-    playerSockets[assignedPlayerId] = socket.id;
-    const defaultPlayerName = `Player ${assignedPlayerId}`;
-    players[socket.id] = { playerId: assignedPlayerId, color: assignedPlayerId === 1 ? 'green' : 'blue', name: defaultPlayerName };
+        // --- Socket.IO Connection Handling (AFTER filter is ready) ---
+        io.on('connection', (socket) => {
+            console.log('User connected:', socket.id, "- Awaiting 'joinGame' with name.");
 
-    if (!boards[assignedPlayerId]) { // Should be created by resetBoardStatesOnly if server just started
-        boards[assignedPlayerId] = createNewBoardState(assignedPlayerId);
-    }
-    boards[assignedPlayerId].color = players[socket.id].color;
-    boards[assignedPlayerId].playerName = players[socket.id].name; // Set name on board state
-    boards[assignedPlayerId].isGameOver = false;
-
-    console.log(`Player ${assignedPlayerId} (${socket.id}) assigned name: ${players[socket.id].name}`);
-    socket.emit('init', {
-        yourPlayerId: assignedPlayerId,
-        gridSize: GRID_SIZE,
-        cellSize: 20, // Client uses this to calc canvas size
-        defaultName: players[socket.id].name
-    });
-
-    // Notify opponent about the new player's name if opponent exists
-    const opponentId = assignedPlayerId === 1 ? 2 : 1;
-    if (playerSockets[opponentId] && players[playerSockets[opponentId]]) {
-        io.to(playerSockets[opponentId]).emit('opponentNameUpdate', {
-            playerId: assignedPlayerId,
-            name: players[socket.id].name
-        });
-        // Also send this player the opponent's current name
-        socket.emit('opponentNameUpdate', {
-            playerId: opponentId,
-            name: players[playerSockets[opponentId]].name
-        });
-    }
-
-
-    if (playerSockets[1] && playerSockets[2]) {
-        initiateGameStartSequence();
-    } else {
-        socket.emit('waiting');
-        io.emit('gameState', getBoardsWithPlayerNames());
-    }
-
-    socket.on('submitPlayerName', (name) => {
-        if (players[socket.id] && name && typeof name === 'string') {
-            const sanitizedName = name.trim().substring(0, 15);
-            if (sanitizedName.length >= 2) {
-                players[socket.id].name = sanitizedName;
-                // Update name on the player's board state directly
-                const playerId = players[socket.id].playerId;
-                if (boards[playerId]) {
-                    boards[playerId].playerName = sanitizedName;
+            socket.on('joinGame', (data) => {
+                if (!data || typeof data.name !== 'string') {
+                    socket.emit('nameRejected', { message: 'Invalid join request data.' });
+                    return;
                 }
-                console.log(`Player ${playerId} (${socket.id}) updated name to: ${sanitizedName}`);
-                socket.emit('nameAccepted', sanitizedName);
-                // Broadcast name change to opponent
-                const opponentSocketId = playerId === 1 ? playerSockets[2] : playerSockets[1];
-                if (opponentSocketId && playerSockets[opponentSocketId === playerSockets[1] ? 1 : 2]) {
-                    io.to(opponentSocketId).emit('opponentNameUpdate', { playerId: playerId, name: sanitizedName });
+                const playerName = data.name.trim();
+
+                if (players[socket.id]) {
+                    console.log(`Socket ${socket.id} (Player ${players[socket.id].name}) tried to join again.`);
+                    socket.emit('alreadyJoined', { message: 'You are already in the game.' });
+                    return;
                 }
-                // Resend game state to ensure all clients have up-to-date names on boards
-                io.emit('gameState', getBoardsWithPlayerNames());
-            } else {
-                socket.emit('nameInvalid', 'Name too short (min 2 chars).');
-            }
-        }
-    });
 
-    socket.on('directionChange', (newDirection) => {
-        if (!gameActuallyRunning) return;
-        const playerInfo = players[socket.id];
-        if (!playerInfo || !boards[playerInfo.playerId] || boards[playerInfo.playerId].isGameOver) return;
-        const board = boards[playerInfo.playerId];
-        const currentDir = board.direction;
-        if (
-            (newDirection === 'UP' && currentDir !== 'DOWN') ||
-            (newDirection === 'DOWN' && currentDir !== 'UP') ||
-            (newDirection === 'LEFT' && currentDir !== 'RIGHT') ||
-            (newDirection === 'RIGHT' && currentDir !== 'LEFT')
-        ) { board.direction = newDirection; }
-    });
+                if (!playerName || playerName.length < 2 || playerName.length > 15) {
+                    socket.emit('nameRejected', { message: 'Name must be between 2 and 15 characters.' });
+                    return;
+                }
+                if (!/^[a-zA-Z0-9_-\s]+$/.test(playerName)) {
+                    socket.emit('nameRejected', { message: 'Name contains invalid characters.' });
+                    return;
+                }
+                try {
+                    if (filterInstance.isProfane(playerName)) {
+                        console.log(`Name rejected by filter for ${socket.id}: ${playerName}`);
+                        socket.emit('nameRejected', { message: 'The name you chose contains inappropriate language. Please pick another.' });
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Profanity filter error:", e);
+                    socket.emit('nameRejected', { message: 'This name cannot be used on the server. Please try again.' });
+                    return;
+                }
 
-    socket.on('joinGame', (data) => {
-        const playerName = data.name ? data.name.trim() : '';
-    
-        if (!playerName || playerName.length < 2 || playerName.length > 15) {
-            socket.emit('nameRejected', { message: 'Name must be between 2 and 15 characters.' });
-            return;
-        }
-        if (!/^[a-zA-Z0-9_-\s]+$/.test(playerName) || playerName.trim() === '') {
-             socket.emit('nameRejected', { message: 'Name contains invalid characters.' });
-             return;
-        }
-    
-        try {
-            if (filter.isProfane(playerName)) {
-                console.log(`Name rejected by filter for ${socket.id}: ${playerName}`);
-                socket.emit('nameRejected', { message: 'The name you chose contains inappropriate language. Please pick another.' });
-                return;
-            }
-        } catch (e) {
-            // Some filters might throw an error on empty strings or weird inputs
-            console.error("Profanity filter error:", e);
-            socket.emit('nameRejected', { message: 'This name can not be used on the server. Please try again.' });
-            return;
-        }
+                let assignedPlayerId = null;
+                if (!playerSockets[1]) {
+                    assignedPlayerId = 1;
+                } else if (!playerSockets[2]) {
+                    assignedPlayerId = 2;
+                } else {
+                    socket.emit('gameFull', { message: 'Sorry, the game is currently full.' });
+                    console.log('Game full when', playerName, 'tried to join with socket:', socket.id);
+                    return;
+                }
 
-        console.log(`Player ${socket.id} chose name: ${playerName}`);
-    });
-    
+                playerSockets[assignedPlayerId] = socket.id;
+                players[socket.id] = {
+                    playerId: assignedPlayerId,
+                    color: assignedPlayerId === 1 ? 'green' : 'blue',
+                    name: playerName,
+                    socketId: socket.id
+                };
 
-    socket.on('requestRestart', () => {
-        if (!players[socket.id]) return;
-        const playerId = players[socket.id].playerId;
-        console.log(`Player ${playerId} (${socket.id}) requested restart.`);
-        restartRequests.add(socket.id);
-        io.to(socket.id).emit('restartRequestedByYou');
-        const opponentSocketId = playerId === 1 ? playerSockets[2] : playerSockets[1];
-        if (opponentSocketId && playerSockets[opponentSocketId === playerSockets[1] ? 1 : 2]) {
-            io.to(opponentSocketId).emit('opponentRequestedRestart');
-        }
-        let connectedPlayerRequests = 0;
-        if (playerSockets[1] && restartRequests.has(playerSockets[1])) connectedPlayerRequests++;
-        if (playerSockets[2] && restartRequests.has(playerSockets[2])) connectedPlayerRequests++;
-        if (connectedPlayerRequests === 2 && playerSockets[1] && playerSockets[2]) {
-            console.log("Both connected players requested restart. Starting new game sequence.");
-            io.emit('allPlayersReadyForRestart');
-            initiateGameStartSequence();
-        }
-    });
+                boards[assignedPlayerId] = createNewBoardState(assignedPlayerId, playerName);
+                boards[assignedPlayerId].isGameOver = false;
 
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        const disconnectedPlayerInfo = players[socket.id];
-        restartRequests.delete(socket.id);
-
-        if (disconnectedPlayerInfo) {
-            const disconnectedPlayerId = disconnectedPlayerInfo.playerId;
-            const disconnectedPlayerName = disconnectedPlayerInfo.name || `Player ${disconnectedPlayerId}`;
-            console.log(`${disconnectedPlayerName} (ID: ${disconnectedPlayerId}) disconnected.`);
-
-            playerSockets[disconnectedPlayerId] = null;
-            delete players[socket.id];
-
-            // Notify remaining player that opponent left (and their name)
-            const remainingPlayerId = disconnectedPlayerId === 1 ? 2 : 1;
-            if (playerSockets[remainingPlayerId]) {
-                io.to(playerSockets[remainingPlayerId]).emit('opponentNameUpdate', {
-                    playerId: disconnectedPlayerId,
-                    name: `Player ${disconnectedPlayerId}` // Or "Disconnected"
+                console.log(`Player ${assignedPlayerId} (${playerName}, ${socket.id}) joined.`);
+                socket.emit('init', {
+                    yourPlayerId: assignedPlayerId,
+                    gridSize: GRID_SIZE,
+                    cellSize: 20,
+                    yourName: playerName
                 });
-            }
 
+                const opponentId = assignedPlayerId === 1 ? 2 : 1;
+                if (playerSockets[opponentId] && players[playerSockets[opponentId]]) {
+                    io.to(playerSockets[opponentId]).emit('opponentNameUpdate', {
+                        playerId: assignedPlayerId,
+                        name: playerName
+                    });
+                    socket.emit('opponentNameUpdate', {
+                        playerId: opponentId,
+                        name: players[playerSockets[opponentId]].name
+                    });
+                }
 
-            if (gameInterval || countdownInterval || gameActuallyRunning) {
-                clearAllIntervalsAndRequests();
-                if(boards[disconnectedPlayerId]) boards[disconnectedPlayerId].isGameOver = true;
+                if (playerSockets[1] && playerSockets[2]) {
+                    console.log("Both players are now in. Initiating game sequence.");
+                    initiateGameStartSequence();
+                } else {
+                    console.log(`Player ${playerName} is waiting for an opponent.`);
+                    socket.emit('waiting');
+                    io.emit('gameState', getBoardsWithPlayerNames());
+                }
+            });
 
-                const winnerId = disconnectedPlayerId === 1 ? 2 : 1;
-                if (playerSockets[winnerId]) {
-                    if(boards[winnerId]) boards[winnerId].isGameOver = false;
-                    io.to(playerSockets[winnerId]).emit('gameOver', { winnerId: winnerId, reason: 'opponentLeft' });
-                    io.to(playerSockets[winnerId]).emit('waiting');
-                } else { resetBoardStatesOnly(); }
-                io.emit('gameState', getBoardsWithPlayerNames());
-            } else if (!playerSockets[1] && !playerSockets[2]){
-                resetBoardStatesOnly();
-                io.emit('gameState', getBoardsWithPlayerNames());
-            } else {
-                 const stillConnectedPlayerSlot = playerSockets[1] ? 1 : (playerSockets[2] ? 2 : null);
-                 if(stillConnectedPlayerSlot){
-                     io.to(playerSockets[stillConnectedPlayerSlot]).emit('waiting');
-                 }
-                 // Reset the board of the disconnected player but keep its slot "empty"
-                 if(boards[disconnectedPlayerId]) boards[disconnectedPlayerId] = createNewBoardState(disconnectedPlayerId);
-                 io.emit('gameState', getBoardsWithPlayerNames());
-            }
-        }
-        if (!playerSockets[1] && !playerSockets[2]) {
-             console.log("All players disconnected. Ready for new game.");
-             resetBoardStatesOnly(); // Full reset of board states
-        }
-    });
-});
+            socket.on('directionChange', (newDirection) => {
+                if (!gameActuallyRunning) return;
+                const playerInfo = players[socket.id];
+                if (!playerInfo || !boards[playerInfo.playerId] || boards[playerInfo.playerId].isGameOver) return;
+
+                const board = boards[playerInfo.playerId];
+                const currentDir = board.direction;
+                if (
+                    (newDirection === 'UP' && currentDir !== 'DOWN') ||
+                    (newDirection === 'DOWN' && currentDir !== 'UP') ||
+                    (newDirection === 'LEFT' && currentDir !== 'RIGHT') ||
+                    (newDirection === 'RIGHT' && currentDir !== 'LEFT')
+                ) {
+                    board.direction = newDirection;
+                }
+            });
+
+            socket.on('requestRestart', () => {
+                if (!players[socket.id]) return;
+                const playerInfo = players[socket.id];
+                console.log(`Player ${playerInfo.name} (ID: ${playerInfo.playerId}, Socket: ${socket.id}) requested restart.`);
+                restartRequests.add(socket.id);
+
+                io.to(socket.id).emit('restartRequestedByYou');
+
+                const opponentId = playerInfo.playerId === 1 ? 2 : 1;
+                const opponentSocketId = playerSockets[opponentId];
+                if (opponentSocketId && players[opponentSocketId]) {
+                    io.to(opponentSocketId).emit('opponentRequestedRestart');
+                }
+
+                let connectedPlayerRequests = 0;
+                if (playerSockets[1] && restartRequests.has(playerSockets[1])) connectedPlayerRequests++;
+                if (playerSockets[2] && restartRequests.has(playerSockets[2])) connectedPlayerRequests++;
+
+                if (playerSockets[1] && playerSockets[2] && connectedPlayerRequests === 2) {
+                    console.log("Both connected players requested restart. Starting new game sequence.");
+                    io.emit('allPlayersReadyForRestart');
+                    initiateGameStartSequence();
+                }
+            });
+
+            socket.on('disconnect', () => {
+                console.log('User disconnected:', socket.id);
+                const disconnectedPlayerInfo = players[socket.id];
+                restartRequests.delete(socket.id);
+
+                if (disconnectedPlayerInfo) {
+                    const disconnectedPlayerId = disconnectedPlayerInfo.playerId;
+                    const disconnectedPlayerName = disconnectedPlayerInfo.name;
+                    console.log(`${disconnectedPlayerName} (ID: ${disconnectedPlayerId}) disconnected.`);
+
+                    playerSockets[disconnectedPlayerId] = null;
+                    if(boards[disconnectedPlayerId]) {
+                        boards[disconnectedPlayerId].isGameOver = true;
+                    }
+                    delete players[socket.id];
+
+                    const remainingPlayerId = disconnectedPlayerId === 1 ? 2 : 1;
+                    const remainingPlayerSocketId = playerSockets[remainingPlayerId];
+
+                    if (gameInterval || countdownInterval || gameActuallyRunning) {
+                        clearAllIntervalsAndRequests();
+                        if (remainingPlayerSocketId && players[remainingPlayerSocketId]) {
+                            if(boards[remainingPlayerId]) boards[remainingPlayerId].isGameOver = false;
+                            io.to(remainingPlayerSocketId).emit('gameOver', { winnerId: remainingPlayerId, reason: 'opponentLeft' });
+                            io.to(remainingPlayerSocketId).emit('waiting');
+                        } else {
+                            resetBoardStatesOnly();
+                        }
+                    } else if (remainingPlayerSocketId && players[remainingPlayerSocketId]){
+                         io.to(remainingPlayerSocketId).emit('opponentNameUpdate', {
+                            playerId: disconnectedPlayerId,
+                            name: `Player ${disconnectedPlayerId}`
+                        });
+                        io.to(remainingPlayerSocketId).emit('waiting');
+                        boards[disconnectedPlayerId] = createNewBoardState(disconnectedPlayerId); // Reset this board slot
+                    } else if (!playerSockets[1] && !playerSockets[2]) {
+                        console.log("All players disconnected. Resetting for new game.");
+                        resetBoardStatesOnly();
+                    }
+                    io.emit('gameState', getBoardsWithPlayerNames());
+                } else {
+                    console.log(`Socket ${socket.id} disconnected but was not in the active players list.`);
+                }
+            });
+        }); // End of io.on('connection')
+
+        // Start listening AFTER filter is ready and io handlers are set up
+        server.listen(PORT, () => {
+            console.log(`Server listening on port ${PORT}`);
+            resetBoardStatesOnly();
+            console.log("Server ready. Initial board states created.");
+        });
+
+    } catch (err) {
+        console.error("Failed to initialize server or load profanity filter:", err);
+        process.exit(1);
+    }
+}
 
 // --- Game Update Logic ---
 async function savePlayerScore(playerName, score) {
-    if (!playerName || typeof score !== 'number' || score <= 0) return;
+    if (!playerName || typeof score !== 'number' || score < 0) { // Allow score 0 to be saved
+        console.log(`Not saving score for ${playerName} with score ${score} (invalid name/score).`);
+        if (score < 0) return; // Do not save negative scores
+    }
     try {
         const newScore = new Score({ playerName, score });
         await newScore.save();
         console.log(`Score saved for ${playerName}: ${score}`);
-    } catch (error) { console.error(`Error saving score for ${playerName}:`, error.message); }
+    } catch (error) {
+        console.error(`Error saving score for ${playerName}:`, error.message);
+    }
 }
 
 function updateGameTick() {
-    if (!playerSockets[1] || !playerSockets[2]) {
-        console.warn("Game tick with missing players. Stopping game.");
-        clearAllIntervalsAndRequests();
-        resetBoardStatesOnly();
-        io.emit('gameState', getBoardsWithPlayerNames());
-        io.emit('waiting');
+    if (!gameActuallyRunning || !playerSockets[1] || !players[playerSockets[1]] || !playerSockets[2] || !players[playerSockets[2]]) {
+        if(gameActuallyRunning) {
+            console.warn("Game tick attempted without two active players or game not running. Stopping.");
+            clearAllIntervalsAndRequests();
+            if (playerSockets[1] && players[playerSockets[1]]) io.to(playerSockets[1]).emit('waiting');
+            if (playerSockets[2] && players[playerSockets[2]]) io.to(playerSockets[2]).emit('waiting');
+            resetBoardStatesOnly();
+            io.emit('gameState', getBoardsWithPlayerNames());
+        }
         return;
     }
 
     let gameEndedThisTick = false;
     [1, 2].forEach(playerId => {
-        if (gameEndedThisTick || boards[playerId].isGameOver) return;
+        if (gameEndedThisTick || !boards[playerId] || boards[playerId].isGameOver) return;
+
         const board = boards[playerId];
         const opponentId = playerId === 1 ? 2 : 1;
         const opponentBoard = boards[opponentId];
+
         const currentHead = board.snake[0];
         const nextHead = { ...currentHead };
+
         switch (board.direction) {
             case 'UP':    nextHead.y -= 1; break;
             case 'DOWN':  nextHead.y += 1; break;
             case 'LEFT':  nextHead.x -= 1; break;
             case 'RIGHT': nextHead.x += 1; break;
         }
+
         if (nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE) {
             board.isGameOver = true; gameEndedThisTick = true; return;
         }
@@ -424,45 +445,62 @@ function updateGameTick() {
                 board.isGameOver = true; gameEndedThisTick = true; return;
             }
         }
-        let ateFood = false, ateDebuff = false, shrinkAmountApplied = 0;
+
+        let ateFood = false;
+        let justShrunkByDebuff = false; // Flag to prevent normal pop if shrunk by debuff
+
         if (nextHead.x === board.food.x && nextHead.y === board.food.y) {
-            ateFood = true; board.score += 10; board.foodEatenCounter++;
-            board.food = getRandomPosition([...board.snake, board.food, ...board.debuffs, ...board.powerups]);
+            ateFood = true;
+            board.score += 10;
+            board.foodEatenCounter++;
+            board.food = getRandomPosition([...board.snake, board.food, ...(board.debuffs || []), ...(board.powerups || [])]);
+
             if (board.foodEatenCounter >= DEBUFF_TRIGGER_COUNT) {
                 board.foodEatenCounter = 0;
                 if (opponentBoard && !opponentBoard.isGameOver) {
-                    opponentBoard.debuffs.push(getRandomPosition([...opponentBoard.snake, opponentBoard.food, ...opponentBoard.debuffs, ...opponentBoard.powerups]));
+                    opponentBoard.debuffs.push(getRandomPosition([...opponentBoard.snake, opponentBoard.food, ...(opponentBoard.debuffs || []), ...(opponentBoard.powerups || [])]));
                 }
             }
         }
+
         const eatenDebuffIndex = board.debuffs.findIndex(d => d.x === nextHead.x && d.y === nextHead.y);
         if (eatenDebuffIndex !== -1) {
-            ateDebuff = true; board.debuffs.splice(eatenDebuffIndex, 1); board.score -= 5;
+            board.debuffs.splice(eatenDebuffIndex, 1);
+            board.score = Math.max(0, board.score - 5);
             let segmentsToRemove = DEBUFF_SHRINK_AMOUNT;
             while (segmentsToRemove > 0 && board.snake.length > MIN_SNAKE_LENGTH) {
-                board.snake.pop(); segmentsToRemove--; shrinkAmountApplied++;
+                board.snake.pop();
+                segmentsToRemove--;
+                justShrunkByDebuff = true;
             }
         }
+
         board.snake.unshift(nextHead);
-        if (!ateFood && shrinkAmountApplied === 0 && board.snake.length > MIN_SNAKE_LENGTH) {
+        if (!ateFood && !justShrunkByDebuff && board.snake.length > MIN_SNAKE_LENGTH) { // Added !justShrunkByDebuff
             board.snake.pop();
         }
-    });
+    }); // End of forEach player loop
 
-    const p1Lost = boards[1].isGameOver;
-    const p2Lost = boards[2].isGameOver;
+    const p1Lost = boards[1] ? boards[1].isGameOver : true; // Assume lost if board doesn't exist
+    const p2Lost = boards[2] ? boards[2].isGameOver : true;
     let winnerId = null;
 
-    if (p1Lost && p2Lost) winnerId = 0;
-    else if (p1Lost) winnerId = 2;
-    else if (p2Lost) winnerId = 1;
+    if (p1Lost && p2Lost) {
+        winnerId = 0; // Draw
+    } else if (p1Lost) {
+        winnerId = 2; // Player 2 wins
+    } else if (p2Lost) {
+        winnerId = 1; // Player 1 wins
+    }
 
-    const currentBoardsWithNames = getBoardsWithPlayerNames(); // Get boards with current names
+    const currentBoardsWithNames = getBoardsWithPlayerNames();
 
-    if (winnerId !== null) {
+    if (winnerId !== null) { // Game has ended
         clearAllIntervalsAndRequests();
+        gameActuallyRunning = false; // Explicitly set
         console.log(`Game Over! Winner: ${winnerId === 0 ? "Draw" : (currentBoardsWithNames[winnerId]?.playerName || `Player ${winnerId}`)}`);
 
+        // Save scores for both players if they were part of the game
         if (playerSockets[1] && players[playerSockets[1]] && boards[1]) {
             savePlayerScore(players[playerSockets[1]].name, boards[1].score);
         }
@@ -470,16 +508,16 @@ function updateGameTick() {
             savePlayerScore(players[playerSockets[2]].name, boards[2].score);
         }
 
-        io.emit('gameOver', { winnerId: winnerId, reason: 'collision' });
-        io.emit('gameState', currentBoardsWithNames);
+        io.emit('gameOver', { winnerId: winnerId, reason: 'collision' }); // Or 'draw'
+        io.emit('gameState', currentBoardsWithNames); // Send final state
     } else {
+        // Game continues, send updated state
         io.emit('gameState', currentBoardsWithNames);
     }
-}
+} // End of updateGameTick
 
-// --- Server Start ---
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-    resetBoardStatesOnly();
-    console.log("Server ready. Initial board states created.");
+// --- Start the Server ---
+initializeServer().catch(err => {
+    console.error("Unhandled error during server startup:", err);
+    process.exit(1);
 });

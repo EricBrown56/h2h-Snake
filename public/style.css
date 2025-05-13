@@ -1,516 +1,401 @@
-/* --- CSS Variables --- */
+/* --- Global Styles & Resets --- */
 :root {
-    --primary-bg: #1a1a2e;
-    --secondary-bg: #16213e;
-    --card-bg: #0f3460;
-    --text-color: #e94560;
-    --text-light: #f0f0f0;
-    --accent-color: #53a8b6;
-    --border-color: #53a8b6;
-    --win-color: #76c893;
-    --lose-color: #e76f51;
-    --waiting-color: #fcca46;
-    --canvas-bg: #2c3e50;
-    --font-primary: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    --font-accent: 'Orbitron', sans-serif;
+    --primary-color: #4A90E2; /* Vibrant Blue */
+    --secondary-color: #50E3C2; /* Tealish Green */
+    --accent-color: #F5A623; /* Warm Orange */
+    --danger-color: #D0021B; /* Strong Red */
+    --success-color: #7ED321; /* Bright Green */
+    --light-bg: #F7F9FC; /* Very light, almost white */
+    --medium-bg: #EBF0F5; /* Slightly darker bg for contrast */
+    --dark-text-color: #2c3e50; /* Dark Blue/Grey for text */
+    --light-text-color: #FFFFFF;
+    --border-color: #D2DCE8;
+    --shadow-color: rgba(74, 144, 226, 0.15); /* Soft blue shadow */
+    --pulse-color: #6CB2F0; /* Lighter blue for pulsing */
+
+    --font-primary: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Modern sans-serif */
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
-
-/* ... (existing CSS Variables and @import) ... */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
 
 body {
-    /* font-family, background-color, color, margin, min-height, box-sizing, opacity, animation (same) */
     font-family: var(--font-primary);
-    background-color: var(--primary-bg);
-    color: var(--text-light);
-    margin: 0; /* Remove default body margin */
-    min-height: 100vh;
-    box-sizing: border-box;
-    opacity: 0;
-    animation: fadeInPage 0.8s ease-out forwards;
-    display: flex; /* Make body a flex container for page-container */
-}
-
-@keyframes fadeInPage { to { opacity: 1; } }
-
-/* --- Main Page Container for Sidebar Layout --- */
-.page-container {
+    background-color: var(--light-bg);
+    color: var(--dark-text-color);
+    line-height: 1.6;
     display: flex;
-    width: 100%;
-    height: 100vh; /* Make it full viewport height */
-    overflow: hidden; /* Prevent body scrollbars if content exceeds */
-}
-
-/* --- Leaderboard Sidebar --- */
-.leaderboard-sidebar {
-    width: 280px; /* Fixed width for the sidebar */
-    min-width: 250px; /* Minimum width */
-    background-color: var(--secondary-bg);
-    padding: 20px;
-    box-sizing: border-box;
-    border-right: 2px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Full height of parent */
-    overflow-y: auto; /* Scrollbar if content exceeds height */
-}
-
-.leaderboard-sidebar h2 {
-    font-family: var(--font-accent), var(--font-primary);
-    color: var(--text-color);
-    margin-top: 0;
-    margin-bottom: 15px;
-    text-align: center;
-    font-size: 1.6em;
-}
-
-#leaderboardList {
-    list-style-type: decimal;
-    padding-left: 20px; /* Adjust indent */
-    margin: 0; /* Reset default ol margin */
-    flex-grow: 1; /* Allow list to take available space */
-    overflow-y: auto; /* Scroll if list is too long for its allocated space */
-}
-
-#leaderboardList li {
-    padding: 7px 0px; /* Adjust padding */
-    border-bottom: 1px solid var(--card-bg);
-    font-size: 1em; /* Adjust font size */
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--text-light);
-}
-#leaderboardList li:last-child {
-    border-bottom: none;
-}
-#leaderboardList .leaderboard-name {
-    /* color is var(--text-light) from parent li */
-    font-weight: normal;
-    overflow: hidden; /* Prevent long names from breaking layout */
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    margin-right: 10px;
-}
-#leaderboardList .leaderboard-score {
-    color: var(--accent-color);
-    font-weight: bold;
-    flex-shrink: 0; /* Prevent score from shrinking */
-}
-
-.sidebar-button { /* For Refresh button */
-    background-color: var(--accent-color);
-    color: var(--primary-bg);
-    border: none;
-    padding: 8px 15px;
-    font-size: 0.9em;
-    font-weight: bold;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    margin-top: 15px; /* Space above button */
-    width: 100%;
-}
-.sidebar-button:hover {
-    background-color: #4798a5;
-}
-
-
-/* --- Main Game Content Area --- */
-.main-content {
-    flex-grow: 1; /* Takes up remaining space */
-    padding: 20px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow-y: auto; /* Scrollbar if content exceeds viewport height */
-    height: 100%;
-}
-
-/* Adjust h1 for main content area if needed */
-.main-content h1 {
-    font-family: var(--font-accent), var(--font-primary);
-    color: var(--text-color);
-    font-size: 2.5em; /* Slightly smaller if space is reduced */
-    margin-bottom: 15px;
-    text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
-    text-align: center;
-}
-
-.status-message { /* Adjust margins if needed */
-    margin-bottom: 20px;
-}
-
-/*.game-container { /* Keep existing styles, ensure it centers */
-    /* display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; width: 100%; max-width: 1000px; */
-    /* No major change needed here unless it conflicts 
-}
-
-/*.player-area { /* May need slight max-width adjustment if game area is squeezed */
-    /* background-color, padding, border-radius, etc (same) */
-    /* min-width: 380px; max-width: 420px; /* Adjust if needed 
-}*/
-
-.controls-area { /* Keep existing styles */
-    margin-top: 20px;
-}
-
-
-/* --- Modal Overlays (Name input, Countdown) --- */
-/* Keep existing .modal-overlay, .modal-content, countdown-overlay styles */
-/* Ensure they still work correctly centered within .main-content or viewport */
-.modal-overlay {
-    position: fixed; /* Fixed to viewport still works best */
-    /* ... (rest of existing modal-overlay styles) ... */
-}
-
-.countdown-overlay {
-    position: fixed; /* Fixed to viewport */
-    /* ... (rest of existing countdown-overlay styles) ... */
-}
-
-
-/* --- Responsive Adjustments for Sidebar --- */
-@media (max-width: 1024px) { /* Breakpoint when sidebar might be too wide */
-    .leaderboard-sidebar {
-        width: 220px; /* Slightly narrower sidebar */
-        min-width: 200px;
-        padding: 15px;
-    }
-    .leaderboard-sidebar h2 { font-size: 1.4em; }
-    #leaderboardList li { font-size: 0.95em; }
-    .sidebar-button { font-size: 0.85em; padding: 7px 12px;}
-}
-
-@media (max-width: 768px) { /* Stack layout: Sidebar on top, then main content */
-    .page-container {
-        flex-direction: column;
-        height: auto; /* Allow page to scroll */
-        overflow: visible;
-    }
-    .leaderboard-sidebar {
-        width: 100%; /* Full width */
-        height: auto; /* Adjust height to content, maybe max-height */
-        max-height: 40vh; /* Example: Limit height, make it scrollable */
-        border-right: none;
-        border-bottom: 2px solid var(--border-color);
-        order: -1; /* Move sidebar to the top */
-    }
-   
-    .main-content {
-        height: auto; /* Allow content to determine height */
-        padding: 15px; /* Reduce padding on smaller screens */
-    }
-    .main-content h1 { font-size: 2em; }
-    .game-container { gap: 20px; }
-    .player-area { min-width: 300px; max-width: 380px; } /* Adjust game areas */
-}
-
-h1 {
-    font-family: var(--font-accent), var(--font-primary);
-    color: var(--text-color);
-    font-size: 2.8em;
-    margin-bottom: 20px;
-    text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
-    text-align: center;
-}
-
-h2 {
-    font-family: var(--font-accent), var(--font-primary);
-    color: var(--accent-color);
-    font-size: 1.5em;
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-
-.status-message {
-    background-color: var(--secondary-bg);
-    color: var(--text-light);
-    padding: 10px 20px;
-    border-radius: 8px;
-    margin-bottom: 25px;
-    font-size: 1.1em;
-    min-width: 300px;
-    text-align: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--border-color);
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.status-message.pulsing {
-    animation: pulseStatus 1.8s infinite ease-in-out;
-}
-
-@keyframes pulseStatus {
-    0%, 100% { background-color: var(--secondary-bg); transform: scale(1); }
-    50% { background-color: var(--accent-color); color: var(--primary-bg); transform: scale(1.03); }
-}
-
-.game-container {
-    display: flex;
-    flex-wrap: wrap;
     justify-content: center;
-    gap: 30px;
-    width: 100%;
-    max-width: 1000px;
-}
-
-.player-area {
-    background-color: var(--card-bg);
+    align-items: flex-start;
+    min-height: 100vh;
     padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
-    text-align: center;
-    border: 2px solid transparent;
-    transition: transform 0.3s ease, border-color 0.3s ease;
-    flex: 1;
-    min-width: 380px;
-    max-width: 450px;
+    overflow-x: hidden; /* Prevent horizontal scroll from shadows */
 }
 
-canvas {
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    background-color: var(--canvas-bg);
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-    display: block;
-    margin: 0 auto 15px auto;
-}
-
-.score {
-    font-size: 1.2em;
-    font-weight: bold;
-    color: var(--text-light);
-}
-
-.score span {
-    color: var(--accent-color);
-    font-family: var(--font-accent), var(--font-primary);
-    min-width: 40px;
-    display: inline-block;
-}
-
-.you-indicator {
-    display: none;
-    color: var(--text-color);
-    font-weight: bold;
-    margin-left: 8px;
-    animation: glowYouIndicator 2s infinite alternate ease-in-out;
-}
-
-@keyframes glowYouIndicator {
-    from { text-shadow: 0 0 3px var(--text-color), 0 0 6px var(--text-color); opacity: 0.8; }
-    to { text-shadow: 0 0 6px var(--text-color), 0 0 12px var(--text-color), 0 0 18px var(--accent-color); opacity: 1; }
-}
-
-.player-status {
-    font-style: italic;
-    font-size: 0.8em;
-    transition: color 0.3s ease;
-}
-.player-status.playing { color: var(--accent-color); }
-.player-status.winner { color: var(--win-color); font-weight: bold; }
-.player-status.lost { color: var(--lose-color); }
-.player-status.waiting { color: var(--waiting-color); }
-.player-status.disconnected { color: #aaa; }
-.player-status.draw { color: var(--text-light); }
-
-/* --- Countdown Overlay --- */
-.countdown-overlay {
+/* --- Player Name Modal --- */
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(26, 26, 46, 0.85);
-    display: flex;
+    background-color: rgba(0, 20, 50, 0.6); /* Darker overlay */
+    display: none;
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    font-size: 12vw; /* Increased for impact */
-    font-family: var(--font-accent), var(--font-primary);
-    color: var(--text-color);
-    text-shadow: 0 0 20px rgba(233, 69, 96, 0.8); /* Enhanced shadow */
-    font-weight: bold;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-    pointer-events: none; /* Allow clicks through if needed, though it covers all */
-}
-.countdown-overlay.visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-/* --- Controls Area & Restart Button --- */
-.controls-area {
-    margin-top: 25px;
-    text-align: center;
-}
-#restartButton {
-    background-color: var(--accent-color);
-    color: var(--primary-bg);
-    border: none;
-    padding: 12px 25px;
-    font-size: 1.1em;
-    font-family: var(--font-primary);
-    font-weight: bold;
-    border-radius: 8px;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-}
-#restartButton:hover {
-    background-color: #4798a5;
-    transform: translateY(-2px);
-}
-#restartButton:active { transform: translateY(0px); }
-#restartButton:disabled {
-    background-color: #555;
-    color: #999;
-    cursor: not-allowed;
-    transform: translateY(0px);
-    opacity: 0.7;
-}
-
-@media (max-width: 850px) {
-    .game-container { flex-direction: column; align-items: center; }
-    .player-area { width: 90%; max-width: 450px; min-width: auto; }
-    h1 { font-size: 2.2em; }
-    .countdown-overlay { font-size: 15vw; }
-}
-@media (max-width: 480px) {
-    body { padding: 10px; }
-    h1 { font-size: 1.8em; }
-    h2 { font-size: 1.3em; }
-    .status-message { font-size: 1em; min-width: auto; width: 90%; }
-    .player-area { padding: 15px; }
-    .countdown-overlay { font-size: 20vw; }
-    #restartButton { padding: 10px 20px; font-size: 1em; }
-}
-/* ... (all existing styles) ... */
-
-/* --- Modal Overlay (Generic for Name Input and Leaderboard) --- */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(26, 26, 46, 0.85); /* Dark semi-transparent */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000; /* Ensure it's on top */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-    padding: 20px; /* Add padding for smaller screens */
-    box-sizing: border-box;
+    padding: 15px;
 }
 
 .modal-overlay.visible {
-    opacity: 1;
-    visibility: visible;
+    display: flex;
 }
 
 .modal-content {
-    background-color: var(--secondary-bg);
-    padding: 25px 30px;
-    border-radius: 12px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    background-color: var(--light-text-color);
+    padding: 35px 45px;
+    border-radius: 16px; /* More rounded */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     text-align: center;
-    border: 1px solid var(--border-color);
-    max-width: 500px;
+    min-width: 350px;
+    max-width: 450px;
     width: 90%;
+    animation: fadeInModal 0.3s ease-out;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .modal-content h2 {
-    color: var(--text-color);
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-.modal-content p {
-    margin-bottom: 20px;
-    color: var(--text-light);
-    line-height: 1.6;
+    margin-bottom: 25px;
+    color: var(--dark-text-color);
+    font-size: 1.8em;
+    font-weight: 600;
 }
 
-/* --- Player Name Input Specific Styles --- */
-#playerNameInput {
-    width: calc(100% - 22px); /* Full width minus padding/border */
-    padding: 10px;
-    margin-bottom: 20px;
+.modal-content input[type="text"] {
+    width: 100%;
+    padding: 14px 18px;
+    margin-bottom: 25px;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: var(--primary-bg);
-    color: var(--text-light);
+    border-radius: 8px; /* Rounded input */
     font-size: 1em;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.modal-content input[type="text"]:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--shadow-color);
+    outline: none;
 }
 
-#playerNameModal button, #leaderboardModal button {
-    background-color: var(--accent-color);
-    color: var(--primary-bg);
+.modal-content button {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--pulse-color) 100%);
+    color: var(--light-text-color);
+    padding: 14px 25px;
     border: none;
-    padding: 10px 20px;
-    font-size: 1em;
-    font-weight: bold;
-    border-radius: 6px;
+    border-radius: 25px; /* Pill shape */
     cursor: pointer;
-    transition: background-color 0.2s ease;
-    margin-top: 10px; /* Add some space if there's a message below */
+    font-size: 1.05em;
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
 }
-
-#playerNameModal button:hover, #leaderboardModal button:hover {
-    background-color: #4798a5;
+.modal-content button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+    animation: pulse-hover 1s infinite alternate;
+}
+.modal-content button:disabled {
+    background: #bdc3c7;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+    animation: none;
 }
 
 .name-status {
-    margin-top: 15px;
+    margin-top: 18px;
     font-size: 0.9em;
-    min-height: 1.2em; /* Prevent layout shift */
+    font-weight: 500;
 }
-.name-status.success { color: var(--win-color); }
-.name-status.error { color: var(--lose-color); }
+.name-status.error { color: var(--danger-color); }
+.name-status.success { color: var(--success-color); }
+
+/* --- Main Layout --- */
+.main-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    width: 100%;
+    max-width: 1500px;
+    background-color: var(--medium-bg);
+    padding: 30px;
+    border-radius: 20px; /* More rounded */
+    box-shadow: 0 8px 25px var(--shadow-color);
+}
+
+#gameContent {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    min-width: 300px; /* Adjust as needed, depends on canvas size */
+}
+
+/* --- Status & Countdown --- */
+#statusArea {
+    text-align: center;
+    padding: 15px;
+    background-color: var(--light-text-color);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+#status {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--dark-text-color);
+}
+#status.pulsing { /* More subtle pulse */
+    animation: subtlePulse 2s infinite ease-in-out;
+}
+@keyframes subtlePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.countdown {
+    font-size: 3.5em;
+    font-weight: 700;
+    color: var(--accent-color);
+    padding: 10px 0;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+/* --- Game Boards Area --- */
+#gameBoardsArea {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 25px;
+}
+
+.player-board-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--light-text-color);
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px; /* Rounded */
+    box-shadow: 0 5px 15px var(--shadow-color);
+    width: calc(50% - 12.5px); /* For two side-by-side, adjust if gap changes */
+    min-width: 320px; /* Ensure it doesn't get too small */
+}
+
+.player-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+.player-header h2 {
+    margin: 0;
+    font-size: 1.6em;
+    font-weight: 600;
+    color: var(--dark-text-color);
+}
+.you-indicator {
+    font-size: 0.8em;
+    font-weight: 700;
+    color: var(--light-text-color);
+    background-color: var(--success-color);
+    padding: 3px 8px;
+    border-radius: 10px; /* Pill shape */
+}
+
+canvas {
+    border: none; /* Remove default border, container has one */
+    background-color: #e0e6ed; /* Neutral canvas background */
+    border-radius: 12px; /* Rounded canvas (visual only, drawing is still on rect) */
+    max-width: 100%;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+}
+
+.player-info {
+    margin-top: 15px;
+    font-size: 1em;
+    color: #555;
+    text-align: center;
+}
+.player-status { font-weight: 600; } /* Make status text bolder */
+.player-status.playing { color: var(--primary-color); }
+.player-status.waiting { color: var(--accent-color); }
+.player-status.winner { color: var(--success-color); }
+.player-status.lost { color: var(--danger-color); }
+.player-status.draw { color: #7f8c8d; }
+.player-status.disconnected { color: #95a5a6; font-style: italic; }
+
+/* --- Game Controls --- */
+#gameControls {
+    text-align: center;
+    margin-top: 10px;
+}
+
+#restartGameButton, #refreshLeaderboardButton { /* Shared styles for pretty buttons */
+    background: linear-gradient(135deg, var(--secondary-color) 0%, #2BCB95 100%); /* Teal gradient */
+    color: var(--light-text-color);
+    padding: 12px 22px;
+    border: none;
+    border-radius: 22px; /* Pill shape */
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 12px rgba(80, 227, 194, 0.3);
+    margin: 5px;
+}
+#restartGameButton:hover, #refreshLeaderboardButton:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 18px rgba(80, 227, 194, 0.4);
+    animation: pulse-hover 1s infinite alternate;
+}
+#restartGameButton:disabled {
+    background: #bdc3c7;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+    animation: none;
+}
+#refreshLeaderboardButton { /* Specific override if needed, e.g., different color */
+    background: linear-gradient(135deg, #AD5389 0%, #3C1053 100%); /* Purple gradient */
+    box-shadow: 0 4px 12px rgba(173, 83, 137, 0.3);
+}
+#refreshLeaderboardButton:hover {
+    box-shadow: 0 6px 18px rgba(173, 83, 137, 0.4);
+}
 
 
-/* --- Leaderboard Specific Styles --- */
-.leaderboard-content {
-    max-width: 600px;
-}
-#leaderboardList {
-    list-style-type: decimal;
-    padding-left: 30px; /* Indent numbers */
-    text-align: left;
-    max-height: 60vh; /* Prevent very long leaderboards from overflowing */
+/* --- Leaderboard Sidebar --- */
+#leaderboardSidebar {
+    flex-basis: 320px;
+    flex-shrink: 0;
+    background-color: var(--light-text-color);
+    padding: 25px;
+    border-radius: 16px; /* Rounded */
+    border: 1px solid var(--border-color);
+    box-shadow: 0 5px 15px var(--shadow-color);
+    max-height: calc(100vh - 80px); /* Ensure it fits viewport with padding */
     overflow-y: auto;
+}
+
+#leaderboardSidebar h2 {
+    text-align: center;
     margin-bottom: 20px;
+    color: var(--dark-text-color);
+    font-size: 1.6em;
+    font-weight: 600;
+}
+
+#leaderboardList {
+    list-style-type: none; /* Remove default numbers, we can add manually or via counter */
+    padding: 0;
 }
 
 #leaderboardList li {
-    padding: 8px 5px;
-    border-bottom: 1px solid var(--card-bg);
-    font-size: 1.1em;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--medium-bg);
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    font-size: 0.95em;
+    counter-increment: leaderboard-counter; /* For custom numbering */
+}
+#leaderboardList li::before { /* Custom numbering */
+    content: counter(leaderboard-counter) ". ";
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-right: 8px;
 }
 #leaderboardList li:last-child {
     border-bottom: none;
 }
-#leaderboardList .leaderboard-name {
-    color: var(--text-light);
-    font-weight: normal;
+.leaderboard-name {
+    font-weight: 500;
+    color: var(--dark-text-color);
 }
-#leaderboardList .leaderboard-score {
-    color: var(--accent-color);
-    font-weight: bold;
+.leaderboard-score {
+    font-weight: 700;
+    color: var(--secondary-color);
+    background-color: #e6f7f0;
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
-#leaderboardList .leaderboard-timestamp {
-    font-size: 0.8em;
-    color: #aaa;
-    margin-left: 10px;
-    font-style: italic;
+/* Pulse Hover Animation */
+@keyframes pulse-hover {
+    from {
+        transform: translateY(-2px) scale(1.02);
+        /* box-shadow: 0 6px 18px rgba(80, 227, 194, 0.4); */ /* Use specific shadow in button style */
+    }
+    to {
+        transform: translateY(-3px) scale(1.05);
+        /* box-shadow: 0 8px 22px rgba(80, 227, 194, 0.5); */
+    }
+}
+
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 1200px) {
+    .player-board-container {
+        width: calc(50% - 10px); /* Adjust for smaller gap */
+    }
+}
+@media (max-width: 992px) {
+    .main-container {
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+    #gameContent {
+        min-width: auto;
+        width: 100%;
+        max-width: 700px; /* Max width for game content when stacked */
+    }
+    .player-board-container {
+        width: 100%; /* Stack player boards if gameContent is narrow */
+    }
+     #gameBoardsArea {
+        flex-direction: column;
+        align-items: center;
+     }
+    #leaderboardSidebar {
+        flex-basis: auto;
+        width: 100%;
+        max-width: 500px;
+        margin-left: 0;
+        margin-top: 30px;
+        max-height: 50vh;
+    }
+}
+
+@media (max-width: 600px) {
+    body { padding: 10px; }
+    .main-container { padding: 15px; gap: 20px; }
+    #gameContent { gap: 15px; }
+    .modal-content { padding: 25px 20px; min-width:auto; }
+    .modal-content h2 { font-size: 1.5em; }
+    .player-header h2 { font-size: 1.3em; }
+    .countdown { font-size: 2.5em;}
+    #leaderboardSidebar { padding: 15px; }
+    #leaderboardSidebar h2 {font-size: 1.3em;}
+    .player-board-container {
+        padding: 15px;
+    }
 }
