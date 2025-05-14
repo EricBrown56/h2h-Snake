@@ -482,7 +482,12 @@ function updateGameTick() {
 
         // Wall collision
         if (nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE) {
-            board.isGameOver = true; gameShouldEnd = true; return;
+            board.isGameOver = true; gameShouldEnd = true; 
+            const playerSocketId = playerSockets[playerId];
+            if (playerSocketId) {
+                io.to(playerSocketId).emit('gameOver', { winnerId: playerId === 1 ? 2 : 1, reason: 'wallCollision' });
+            }
+            return;
         }
         // Self collision
         for (let i = 0; i < board.snake.length; i++) { // Check against all segments including new potential head if it overlaps
@@ -492,7 +497,7 @@ function updateGameTick() {
         }
         if (board.isGameOver) return;
 
-
+        // eat food
         let ateFood = false;
         let justShrunkByDebuff = false;
 
@@ -501,6 +506,11 @@ function updateGameTick() {
             board.score += 10;
             board.foodEatenCounter++;
             board.food = getRandomPosition([...board.snake, board.food, ...(board.debuffs || []), ...(board.powerups || [])]);
+
+            const playerSocketId = playerSockets[playerId];
+            if (playerSocketId) {
+                io.to(playerSocketId).emit('playSound', 'eatFood');
+            }
 
             if (board.foodEatenCounter >= DEBUFF_TRIGGER_COUNT) {
                 board.foodEatenCounter = 0;
@@ -520,6 +530,10 @@ function updateGameTick() {
             while (segmentsToRemove > 0 && board.snake.length > MIN_SNAKE_LENGTH) {
                 board.snake.pop();
                 segmentsToRemove--;
+                const playerSocketId = playerSockets[playerId];
+                if (playerSocketId) {
+                    io.to(playerSocketId).emit('playSound', 'debuffPickup');
+                }
             }
             justShrunkByDebuff = true;
         }

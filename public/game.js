@@ -9,6 +9,7 @@ let playerNameModal, playerNameInput, submitNameButton, nameStatusMessage; // 's
 let leaderboardList, refreshLeaderboardButton; // Leaderboard is now a sidebar
 let p1NameDisplay, p2NameDisplay;
 let gameAreaDiv; // Main game area div
+let soundToggleMuteButton; // Sound toggle button
 
 // --- Client Game State ---
 let myPlayerId = null;
@@ -16,7 +17,23 @@ let gridSize = null, cellSize = 20, canvasWidth = null, canvasHeight = null;
 let currentBoardsState = null;
 let gameActiveForInput = false;
 let localPlayerName = null; // Store the player's chosen name locally, confirmed by server
+let sounds = {
+    eatFood: new Audio('/audio/eat_food.mp3'),
+    gameOver: new Audio('/audio/game_over.mp3'),
+    click: new Audio('/audio/click.mp3'),
+    countdown: new Audio('/audio/count.mp3'),
+    debuff: new Audio('/audio/debuff_pickup.mp3'),
+    go: new Audio('/audio/go.mp3'),
+    shrink: new Audio('/audio/snake_shrink.mp3'),
+    wallHit: new Audio('/audio/wall_hit.mp3'),
+    backgroundMusic: new Audio('/audio/background_music.mp3')
 
+    // Add more sounds as needed
+};
+
+let isMuted = false; // Track if sounds are muted
+const SOUND_VOLUME = 0.5; // Set a default volume for sounds
+const MUSIC_VOLUME = 0.2; // Set a default volume for background music
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     // Get canvas elements and contexts
@@ -25,7 +42,15 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas2 = document.getElementById('gameCanvas2');
     if (canvas2) ctx2 = canvas2.getContext('2d'); else console.error("Canvas2 not found");
     gameAreaDiv = document.getElementById('gameArea'); 
+    soundToggleMuteButton = document.getElementById('soundToggleMuteButton');
 
+    // Load sounds 
+    loadSounds(); 
+
+    if (soundToggleMuteButton) {
+        soundToggleMuteButton.addEventListener('click', toggleMuteAllSounds); 
+        updateMuteButtonVisuals(); 
+    }  
     // Get UI elements
     statusDiv = document.getElementById('status');
     score1Span = document.getElementById('score1'); score2Span = document.getElementById('score2');
@@ -82,6 +107,84 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSocketEventHandlers();
     document.addEventListener('keydown', handleKeyPress);
 });
+
+// --- Sound Functions ---
+function loadSounds() { 
+    console.log("Loading sounds..."); 
+    sounds.eatFood = new Audio('/audio/eat_food.mp3');
+    sounds.gameOver = new Audio('/audio/game_over.mp3');
+    sounds.click = new Audio('/audio/click.mp3');
+    sounds.countdown = new Audio('/audio/count.mp3');
+    sounds.debuff = new Audio('/audio/debuff_pickup.mp3');
+    sounds.go = new Audio('/audio/go.mp3');
+    sounds.shrink = new Audio('/audio/snake_shrink.mp3');
+    sounds.wallHit = new Audio('/audio/wall_hit.mp3');
+
+    sounds.backgroundMusic = new Audio('/audio/background_music.mp3');
+    sounds.backgroundMusic.loop = true; // Loop the background music
+
+    // Set initial volumes
+    for (const key in sounds) { 
+        if (key.toLowerCase().includes('music')) {
+            sounds[key].volume = MUSIC_VOLUME; 
+        } else {
+            sounds[key].volume = SOUND_VOLUME; 
+        }
+    }
+    console.log("Sounds loaded.");
+}
+
+function playSound(soundName) { 
+    if (isMuted || sounds[soundName]) return; // Don't play if muted or sound not found
+    if (sounds[soundName].paused || sounds[soundName].ended) {
+        sounds[soundName].currentTime = 0; // Reset to start
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
+    } else {
+        sounds[soundName].currentTime = 0; // Reset to start
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
+    }
+} 
+
+function playMusic(musicName) {
+    if (isMuted || !sounds[musicName]) return; // Don't play if muted or sound not found
+    if (sounds[musicName].paused) {
+        sounds[musicName].currentTime = 0; // Reset to start
+        sounds[musicName].play().catch(error => console.warn(`Error playing music ${musicName}:`, error));
+    }
+}
+
+function stopMusic(musicName) {
+    if (sounds[musicName]) {
+        sounds[musicName].pause();
+        sounds[musicName].currentTime = 0; // Reset to start
+    }
+}
+
+function stopAllSoundsAndMusic() {
+    for (const key in sounds) {
+        if (sounds[key]) {
+            sounds[key].pause();
+            sounds[key].currentTime = 0; // Reset to start
+        }
+    }
+}
+
+function toggleMuteAllSounds() {
+    isMuted = !isMuted; // Toggle mute state
+    if (isMuted) {
+        stopAllSoundsAndMusic(); // Stop all sounds and music
+    } else {
+        playMusic('backgroundMusic'); // Play background music if unmuted
+    }
+    console.log("Sound muted:", isMuted);
+    updateMuteButtonVisuals();
+}
+
+function updateMuteButtonVisuals() {
+    if (soundToggleMuteButton) {
+        soundToggleMuteButton.textContent = isMuted ? 'Unmute Sounds' : 'Mute Sounds';
+    }
+}
 
 // --- Utility Functions ---
 function updateStatus(message, shouldPulse = false) {
@@ -162,6 +265,7 @@ function handleJoinGameAttempt() {
         nameStatusMessage.textContent = 'Name must be 2-15 characters.';
         nameStatusMessage.className = 'name-status error';
     }
+    playSound('click'); // Play sound on button click
 }
 
 // --- Leaderboard Functions ---
@@ -255,6 +359,8 @@ function setupSocketEventHandlers() {
         canvasHeight = gridSize * cellSize;
         localPlayerName = data.yourName;
 
+        stopAllSoundsAndMusic(); // Stop all sounds on init
+
         [canvas1, canvas2].forEach(c => { if (c) { c.width = canvasWidth; c.height = canvasHeight; } });
 
         if (playerNameModal) playerNameModal.classList.remove('visible');
@@ -278,6 +384,7 @@ function setupSocketEventHandlers() {
     // --- END ---
 
     updateStatus(`You are ${localPlayerName} (Player ${myPlayerId}). Waiting for opponent...`, true);
+
     });
 
     socket.on('nameRejected', (data) => {
@@ -360,8 +467,11 @@ function setupSocketEventHandlers() {
         }
         if (count === 'GO!') {
             updateStatus('GO!');
+            playSound('go');
             gameActiveForInput = true;
+            playMusic('backgroundMusic'); // Start background music
         } else if (typeof count === 'number') {
+            playSound('count');
             updateStatus(`Game starting in ${count}...`);
         }
     });
@@ -380,6 +490,23 @@ function setupSocketEventHandlers() {
         }
         console.log("Socket.IO: Received game state:", boardsData);
         currentBoardsState = boardsData;
+
+        if (myPlayerId && currentBoardsState && currentBoardsState[myPlayerId] && boardsData && boardsData[myPlayerId]) {
+            const oldPlayerBoard = currentBoardsState[myPlayerId];
+            const newPlayerBoard = boardsData[myPlayerId];
+
+            // Food eaten sound
+            if (newPlayerBoard.score > oldPlayerBoard.score && newPlayerBoard.snake.length >= oldPlayerBoard.snake.length) {
+                playSound('eatFood');
+            }
+            // Debuff pickup sound
+            if (oldPlayerBoard.debuffs && newPlayerBoard.debuffs && newPlayerBoard.debuffs.length < oldPlayerBoard.debuffs.length) {
+                playSound('debuffPickup');
+            }
+        }
+
+        currentBoardsState = boardsData;
+
         drawGame();
 
         [1, 2].forEach(playerId => {
@@ -462,6 +589,9 @@ function setupSocketEventHandlers() {
                  showPlayerNameModal(localPlayerName || (myPlayerId ? `Player ${myPlayerId}` : ''));
             }
         }, 1500);
+
+        stopMusic('backgroundMusic'); // Stop background music on game over
+        playSound('gameOver'); // Play game over sound
     });
 
     socket.on('gameFull', (data) => { // Expects data.message
@@ -493,6 +623,15 @@ function setupSocketEventHandlers() {
         if (restartButton) restartButton.style.display = 'none';
         if (countdownDisplayDiv) countdownDisplayDiv.classList.remove('visible');
     });
+
+    socket.on('playSound', (soundName) => {
+        // Play sound on client side from server request
+        if (sounds[soundName]) {
+            playSound(soundName);
+        } else {
+            console.warn(`Sound ${soundName} not found on client.`);
+        }
+    })
 } // End of setupSocketEventHandlers
 
 
