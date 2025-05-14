@@ -210,24 +210,36 @@ function renderLeaderboard(scores) {
 function setupSocketEventHandlers() {
     socket.on('connect', () => {
         console.log('Socket.IO: Connected! Socket ID:', socket.id);
-        if (playerNameModal && !playerNameModal.classList.contains('visible') && !myPlayerId) {
-            showPlayerNameModal();
+        if (playerNameModal && !playerNameModal.classList.contains('visible') && !myPlayerId) { // If modal not visible and no player ID
+            showPlayerNameModal(localPlayerName || ''); // Pass localPlayerName as default
             updateStatus('Connected. Enter your name to join.', true);
-        } else if (!myPlayerId) {
+        } else if (!myPlayerId) { // If no player ID (modal might be visible)
             updateStatus('Connected. Enter your name to join.', true);
-        } else {
-            updateStatus('Reconnected to server.');
+             if (playerNameInput && localPlayerName) playerNameInput.value = localPlayerName; // Pre-fill if modal shows
+        } else { // Has myPlayerId - was likely in a game
+            updateStatus('Reconnected to server. Attempting to rejoin...');
+            // Attempt to rejoin automatically if we have the necessary info
+            if (localPlayerName) {
+                console.log("Client: Reconnecting, attempting to rejoin with name:", localPlayerName);
+                socket.emit('joinGame', { name: localPlayerName, rejoining: true /* you might add old socket.id or playerID if server uses it */ });
+            } else {
+                // If localPlayerName was lost, might need to show modal again
+                showPlayerNameModal();
+                updateStatus('Reconnected. Please re-enter your name to join.', true);
+            }
         }
     });
 
     socket.on('disconnect', (reason) => {
         console.log('Socket.IO: Disconnected -', reason);
-        updateStatus('Disconnected. Please refresh.');
-        myPlayerId = null; gameActiveForInput = false;
+        updateStatus('Disconnected. Attempting to reconnect...'); // Changed message
+        // myPlayerId = null; // Keep myPlayerId for rejoin attempt on 'connect'
+        gameActiveForInput = false;
         updatePlayerStatusAndClass(1, "Offline", "disconnected");
         updatePlayerStatusAndClass(2, "Offline", "disconnected");
-        if (p1NameDisplay) p1NameDisplay.textContent = "Player 1";
-        if (p2NameDisplay) p2NameDisplay.textContent = "Player 2";
+        // Don't reset player names immediately, they might be useful for rejoin
+        // if (p1NameDisplay) p1NameDisplay.textContent = "Player 1";
+        // if (p2NameDisplay) p2NameDisplay.textContent = "Player 2";
         if (youP1Span) youP1Span.style.display = 'none';
         if (youP2Span) youP2Span.style.display = 'none';
         if (restartButton) restartButton.style.display = 'none';

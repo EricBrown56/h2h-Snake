@@ -248,7 +248,7 @@ canvas {
     margin-top: 10px;
 }
 
-#restartGameButton, #refreshLeaderboardButton { /* Shared styles for pretty buttons */
+#restartButton, #refreshLeaderboardButton { /* Shared styles for pretty buttons */
     background: linear-gradient(135deg, var(--secondary-color) 0%, #2BCB95 100%); /* Teal gradient */
     color: var(--light-text-color);
     padding: 12px 22px;
