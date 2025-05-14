@@ -504,69 +504,136 @@ function drawGame() {
     }
 }
 
+// game.js (or wherever your drawBoard function is)
+
 function drawBoard(playerId, boardState, context) {
     if (!context || !boardState) return;
-    clearCanvas(context);
+    clearCanvas(context); // Assuming clearCanvas is defined and works
 
+    const radius = cellSize / 2; // Radius for full-cell circles
+
+    // --- Draw Food (as a circle) ---
     if (boardState.food) {
-        context.fillStyle = 'red';
-        context.fillRect(boardState.food.x * cellSize, boardState.food.y * cellSize, cellSize, cellSize);
+        context.fillStyle = 'red'; // Food color
+        context.beginPath();
+        context.arc(
+            boardState.food.x * cellSize + radius, // center x
+            boardState.food.y * cellSize + radius, // center y
+            radius,                                // circle radius
+            0,                                     // startAngle
+            2 * Math.PI                            // endAngle (full circle)
+        );
+        context.fill();
     }
 
+    // --- Draw Debuffs (keeping them as smaller squares for now, or change to circles if desired) ---
     if (boardState.debuffs) {
-        context.fillStyle = 'purple';
+        context.fillStyle = 'purple'; // Debuff color
         boardState.debuffs.forEach(debuff => {
+            // Original square debuff:
             context.fillRect(debuff.x * cellSize + cellSize * 0.15, debuff.y * cellSize + cellSize * 0.15, cellSize * 0.7, cellSize * 0.7);
+            
+            // If you want circular debuffs (optional):
+            // const debuffRadius = (cellSize * 0.7) / 2;
+            // context.beginPath();
+            // context.arc(
+            //     debuff.x * cellSize + radius, // center x (same as full cell for simplicity here)
+            //     debuff.y * cellSize + radius, // center y
+            //     debuffRadius,
+            //     0,
+            //     2 * Math.PI
+            // );
+            // context.fill();
         });
     }
 
+    // --- Draw Snake (as circles) ---
     if (boardState.snake) {
-        context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue');
-        context.strokeStyle = '#111';
-        context.lineWidth = 1;
-        boardState.snake.forEach((segment, index) => {
-            context.fillRect(segment.x * cellSize, segment.y * cellSize, cellSize, cellSize);
-            context.strokeRect(segment.x * cellSize, segment.y * cellSize, cellSize, cellSize);
-            if (index === 0 && boardState.direction) {
-                context.fillStyle = '#FFF';
-                let eyeX = segment.x * cellSize;
-                let eyeY = segment.y * cellSize;
-                const eyeSize = Math.max(1, Math.floor(cellSize / 5)); // Ensure eyeSize is at least 1
+        context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue'); // Snake color
+        context.strokeStyle = '#111'; // Outline color for segments
+        context.lineWidth = 1;         // Outline width
 
-                switch(boardState.direction.toUpperCase()) { // Use toUpperCase for safety
+        boardState.snake.forEach((segment, index) => {
+            // Draw segment body
+            context.beginPath();
+            context.arc(
+                segment.x * cellSize + radius, // center x
+                segment.y * cellSize + radius, // center y
+                radius,                        // segment radius
+                0,
+                2 * Math.PI
+            );
+            context.fill();
+            if (context.lineWidth > 0) { // Only draw stroke if lineWidth is set
+                context.stroke(); // Outline for the segment
+            }
+
+            // --- Draw Eyes on the Head (as circles) ---
+            if (index === 0 && boardState.direction) { // If it's the head segment
+                context.fillStyle = '#FFF'; // Eye color (white)
+                const eyeSize = Math.max(1, Math.floor(cellSize / 4.5)); // Radius of the eye
+                let eye1X, eye1Y, eye2X, eye2Y; // Positions for two eyes
+
+                // Calculate eye positions based on direction (more distinct two eyes look)
+                // These positions are relative to the center of the head segment
+                const offsetAmount = radius * 0.45; // How far from center eyes are
+
+                switch (boardState.direction.toUpperCase()) {
                     case 'UP':
-                        eyeX += cellSize / 2 - eyeSize / 2;
-                        eyeY += cellSize / 4 - eyeSize / 2;
+                        eye1X = segment.x * cellSize + radius - offsetAmount;
+                        eye1Y = segment.y * cellSize + radius - offsetAmount * 0.5;
+                        eye2X = segment.x * cellSize + radius + offsetAmount;
+                        eye2Y = segment.y * cellSize + radius - offsetAmount * 0.5;
                         break;
                     case 'DOWN':
-                        eyeX += cellSize / 2 - eyeSize / 2;
-                        eyeY += cellSize * 0.75 - eyeSize / 2;
+                        eye1X = segment.x * cellSize + radius - offsetAmount;
+                        eye1Y = segment.y * cellSize + radius + offsetAmount * 0.5;
+                        eye2X = segment.x * cellSize + radius + offsetAmount;
+                        eye2Y = segment.y * cellSize + radius + offsetAmount * 0.5;
                         break;
                     case 'LEFT':
-                        eyeX += cellSize / 4 - eyeSize / 2;
-                        eyeY += cellSize / 2 - eyeSize / 2;
+                        eye1X = segment.x * cellSize + radius - offsetAmount * 0.5;
+                        eye1Y = segment.y * cellSize + radius - offsetAmount;
+                        eye2X = segment.x * cellSize + radius - offsetAmount * 0.5;
+                        eye2Y = segment.y * cellSize + radius + offsetAmount;
                         break;
                     case 'RIGHT':
-                        eyeX += cellSize * 0.75 - eyeSize / 2;
-                        eyeY += cellSize / 2 - eyeSize / 2;
+                        eye1X = segment.x * cellSize + radius + offsetAmount * 0.5;
+                        eye1Y = segment.y * cellSize + radius - offsetAmount;
+                        eye2X = segment.x * cellSize + radius + offsetAmount * 0.5;
+                        eye2Y = segment.y * cellSize + radius + offsetAmount;
                         break;
+                    default: // Should not happen if direction is always set
+                        return;
                 }
-                context.fillRect(eyeX, eyeY, eyeSize, eyeSize);
-                context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue'); // Reset fillStyle
+
+                // Draw first eye
+                context.beginPath();
+                context.arc(eye1X, eye1Y, eyeSize, 0, 2 * Math.PI);
+                context.fill();
+
+                // Draw second eye
+                context.beginPath();
+                context.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
+                context.fill();
+
+                // Reset fillStyle to snake color for next segments
+                context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue');
             }
         });
     }
 
+    // --- Draw Game Over Overlay ---
     if (boardState.isGameOver) {
         context.fillStyle = 'rgba(26, 26, 46, 0.75)'; // Dark overlay
-        context.fillRect(0, 0, canvasWidth, canvasHeight);
+        context.fillRect(0, 0, canvasWidth, canvasHeight); // Assuming canvasWidth/Height are available
         context.fillStyle = '#e94560'; // Accent text color
         const bodyFont = getComputedStyle(document.body).fontFamily.split(',')[0].trim() || 'sans-serif';
         context.font = `bold ${Math.max(24, Math.floor(cellSize * 1.5))}px ${bodyFont}`;
         context.textAlign = 'center';
         context.shadowColor = 'black'; context.shadowBlur = 5;
         context.fillText('GAME OVER', canvasWidth / 2, canvasHeight / 2);
-        context.shadowBlur = 0;
+        context.shadowBlur = 0; // Reset shadow
     }
 }
 
