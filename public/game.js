@@ -8,6 +8,7 @@ let countdownDisplayDiv, restartButton;
 let playerNameModal, playerNameInput, submitNameButton, nameStatusMessage; // 'submitNameButton' will be our "Join Game" button
 let leaderboardList, refreshLeaderboardButton; // Leaderboard is now a sidebar
 let p1NameDisplay, p2NameDisplay;
+let gameAreaDiv; // Main game area div
 
 // --- Client Game State ---
 let myPlayerId = null;
@@ -337,6 +338,7 @@ function setupSocketEventHandlers() {
         }
 
         if (count === null) {
+            gameActiveForInput = true;
             if (countdownDisplayDiv) countdownDisplayDiv.classList.remove('visible');
             return;
         }
@@ -569,20 +571,51 @@ function drawBoard(playerId, boardState, context) {
 }
 
 // --- Keyboard Input Handler ---
+// --- Keyboard Input Handler ---
 function handleKeyPress(event) {
+    console.log(`Key Press: ${event.key}, gameActiveForInput: ${gameActiveForInput}, myPlayerId: ${myPlayerId}, boardExists: ${!!(currentBoardsState && currentBoardsState[myPlayerId])}, isGameOver: ${currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'}`)
+    // Check if input should be processed:
+    // 1. Is the game active for input? (e.g., not in countdown, not game over)
+    // 2. Does the client have a player ID?
+    // 3. Is there a current board state for this player?
+    // 4. Is this player's game NOT over?
     if (!gameActiveForInput || !myPlayerId || !currentBoardsState || !currentBoardsState[myPlayerId] || currentBoardsState[myPlayerId].isGameOver) {
+        // Optional: Log why input is being ignored, can be helpful for debugging
+        // console.log("Key press ignored. Conditions:", {
+        //     gameActiveForInput,
+        //     myPlayerId,
+        //     hasBoardState: !!(currentBoardsState && currentBoardsState[myPlayerId]),
+        //     isGameOver: currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'
+        // });
         return;
     }
+
     let direction = null;
-    // Added Arrow keys for convenience as well
+    // Use toUpperCase() for matching the event.key, but assign the lowercase string for the server
     switch (event.key.toUpperCase()) {
-        case 'W': case 'ARROWUP': direction = 'UP'; break;
-        case 'S': case 'ARROWDOWN': direction = 'DOWN'; break;
-        case 'A': case 'ARROWLEFT': direction = 'LEFT'; break;
-        case 'D': case 'ARROWRIGHT': direction = 'RIGHT'; break;
-        default: return;
+        case 'W':
+        case 'ARROWUP':
+            direction = 'up'; // Changed to lowercase
+            break;
+        case 'S':
+        case 'ARROWDOWN':
+            direction = 'down'; // Changed to lowercase
+            break;
+        case 'A':
+        case 'ARROWLEFT':
+            direction = 'left'; // Changed to lowercase
+            break;
+        case 'D':
+        case 'ARROWRIGHT':
+            direction = 'right'; // Changed to lowercase
+            break;
+        default:
+            // Not a movement key we care about
+            return;
     }
-    if(direction) { // Only emit if a valid direction was determined
+
+    if (direction) {
+        // console.log(`Client: Emitting directionChange '${direction}' for player ${myPlayerId}`); // For debugging
         socket.emit('directionChange', direction);
     }
 }

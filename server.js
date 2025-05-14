@@ -63,7 +63,7 @@ function createNewBoardState(playerId, playerNameFromArg) {
     return {
         playerId: playerId,
         snake: initialSnake,
-        direction: 'RIGHT',
+        direction: 'right',
         color: startColor,
         score: 0,
         food: getRandomPosition(initialSnake),
@@ -290,20 +290,62 @@ async function initializeServer() {
                 }
             });
 
-            socket.on('directionChange', (newDirection) => {
-                if (!gameActuallyRunning) return;
-                const playerInfo = players[socket.id];
-                if (!playerInfo || !boards[playerInfo.playerId] || boards[playerInfo.playerId].isGameOver) return;
+            // Presuming 'players', 'boards', and 'gameActuallyRunning' are defined elsewhere in your server.js
 
+            socket.on('directionChange', (newDirection) => {
+                if (!gameActuallyRunning) {
+                    console.log(`S: Direction change '${newDirection}' ignored, game not running.`);
+                    return;
+                }
+            
+                const playerInfo = players[socket.id];
+                if (!playerInfo || !boards[playerInfo.playerId] || boards[playerInfo.playerId].isGameOver) {
+                    console.log(`S: Direction change '${newDirection}' ignored for socket ${socket.id}, player invalid or game over.`);
+                    return;
+                }
+            
                 const board = boards[playerInfo.playerId];
                 const currentDir = board.direction;
+            
                 if (
-                    (newDirection === 'UP' && currentDir !== 'DOWN') ||
-                    (newDirection === 'DOWN' && currentDir !== 'UP') ||
-                    (newDirection === 'LEFT' && currentDir !== 'RIGHT') ||
-                    (newDirection === 'RIGHT' && currentDir !== 'LEFT')
+                    (newDirection === 'up' && currentDir !== 'down') ||
+                    (newDirection === 'down' && currentDir !== 'up') ||
+                    (newDirection === 'left' && currentDir !== 'right') ||
+                    (newDirection === 'right' && currentDir !== 'left') ||
+                    !currentDir // Allow setting initial direction if currentDir is null/undefined
                 ) {
-                    board.direction = newDirection;
+                    board.direction = newDirection; // Keep the string representation
+            
+                    // *** ADD THIS PART TO UPDATE NUMERIC dx/dy ON THE BOARD OBJECT ***
+                    switch (newDirection) {
+                        case 'up':
+                            board.dx = 0;
+                            board.dy = -1;
+                            break;
+                        case 'down':
+                            board.dx = 0;
+                            board.dy = 1;
+                            break;
+                        case 'left':
+                            board.dx = -1;
+                            board.dy = 0;
+                            break;
+                        case 'right':
+                            board.dx = 1;
+                            board.dy = 0;
+                            break;
+                        default:
+                            // This case should ideally not be hit if newDirection is validated client-side
+                            // or if you add further validation for newDirection here.
+                            console.error(`S: Invalid newDirection '${newDirection}' received in directionChange handler.`);
+                            board.dx = 0; // Default to no movement if direction is weird
+                            board.dy = 0;
+                            break;
+                    }
+                    console.log(`S: Player ${playerInfo.playerId} direction changed to ${board.direction} (dx: ${board.dx}, dy: ${board.dy})`);
+            
+                } else {
+                    console.log(`S: Player ${playerInfo.playerId} attempted invalid direction change from ${currentDir} to ${newDirection}`);
                 }
             });
 
@@ -430,20 +472,46 @@ function updateGameTick() {
         const currentHead = board.snake[0];
         const nextHead = { ...currentHead };
 
+        
+        // --- Define dx and dy for clarity, even if used directly in nextHead calculation ---
+        let dx = 0;
+        let dy = 0;
+
         switch (board.direction) {
-            case 'UP':    nextHead.y -= 1; break;
-            case 'DOWN':  nextHead.y += 1; break;
-            case 'LEFT':  nextHead.x -= 1; break;
-            case 'RIGHT': nextHead.x += 1; break;
+            case 'up':
+                dy = -1;
+                break;
+            case 'down':
+                dy = 1;
+                break;
+            case 'left':
+                dx = -1;
+                break;
+            case 'right':
+                dx = 1;
+                break;
+            default:
+                // This case handles if board.direction is undefined or an unexpected string
+                console.warn(`SERVER: Player ${playerId} has an invalid or unset board.direction: '${board.direction}'. Snake will not move this tick.`);
+                // dx and dy remain 0, so nextHead will be same as currentHead
+                // No need to explicitly return or skip, the snake just won't move.
+                break;
         }
 
+        // Update nextHead based on dx and dy
+        nextHead.x += dx;
+        nextHead.y += dy;
+
+        // If dx and dy are both 0 (e.g., from default case or if direction was not set yet),
+        // then nextHead will be identical to currentHead. The snake effectively doesn't move.
+        // This is generally fine.
+
         if (nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE) {
-            board.isGameOver = true; gameEndedThisTick = true; return;
-        }
-        for (let i = 0; i < board.snake.length; i++) {
-            if (nextHead.x === board.snake[i].x && nextHead.y === board.snake[i].y) {
-                board.isGameOver = true; gameEndedThisTick = true; return;
-            }
+            console.log(`SERVER: Player ${playerId} hit wall. Direction: ${board.direction}, Head: ${currentHead.x},${currentHead.y} -> Next: ${nextHead.x},${nextHead.y}`);
+            board.isGameOver = true;
+            gameEndedThisTick = true;
+            // gameOver(playerId === 1 ? 2 : 1, 'opponentCrashed'); // Call your game over logic
+            return;
         }
 
         let ateFood = false;
