@@ -195,35 +195,8 @@ app.use(express.static(path.join(__dirname, 'public'))); // Ensure this path is 
 app.use(express.json());
 
 // --- API Endpoints ---
-app.get('/api/leaderboard', async (req, res) => {
-    try {
-        // Use Mongoose aggregation to get the highest score for each unique playerName
-        const topScores = await Score.aggregate([
-            { $sort: { score: -1 } }, // Sort by score first to ensure $first picks the highest
-            {
-                $group: {
-                    _id: "$playerName", // Group by playerName
-                    highestScore: { $first: "$score" }, // Get the first score (which is the highest due to sort)
-                    timestamp: { $first: "$timestamp" } // Get timestamp of that highest score
-                }
-            },
-            { $sort: { highestScore: -1 } }, // Sort the groups by highestScore
-            { $limit: 10 }, // Limit to top 10 unique players
-            {
-                $project: { // Reshape the output
-                    _id: 0, // Exclude the default _id from group stage
-                    playerName: "$_id", // Rename _id to playerName
-                    score: "$highestScore",
-                    timestamp: "$timestamp"
-                }
-            }
-        ]);
-        res.json(topScores);
-    } catch (error) {
-        console.error("Error fetching leaderboard:", error);
-        res.status(500).json({ message: "Error fetching leaderboard data." });
-    }
-});
+
+
 
 
 // --- Main Server Initialization Function ---
@@ -468,6 +441,36 @@ async function startServer() {
     // Setup Express routes and static files AFTER app is defined
     app.use(express.static(path.join(__dirname, 'public')));
     app.use(express.json());
+
+    app.get('/api/leaderboard', async (req, res) => {
+        try {
+            // Use Mongoose aggregation to get the highest score for each unique playerName
+            const topScores = await Score.aggregate([
+                { $sort: { score: -1 } },
+                {
+                    $group: {
+                        _id: "$playerName",
+                        highestScore: { $first: "$score" },
+                        timestamp: { $first: "$timestamp" }
+                    }
+                },
+                { $sort: { highestScore: -1 } },
+                { $limit: 10 },
+                {
+                    $project: {
+                        _id: 0,
+                        playerName: "$_id",
+                        score: "$highestScore",
+                        timestamp: "$timestamp"
+                    }
+                }
+            ]);
+            res.json(topScores);
+        } catch (error) {
+            console.error("Error fetching leaderboard:", error);
+            res.status(500).json({ message: "Error fetching leaderboard data." });
+        }
+    });
 }
 
 server.listen(PORT, () => {
