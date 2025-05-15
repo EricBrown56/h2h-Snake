@@ -15,6 +15,9 @@ const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
+server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+});
 
 // --- Game Constants ---
 const GRID_SIZE = 20;
