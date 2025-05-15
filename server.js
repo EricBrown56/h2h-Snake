@@ -7,6 +7,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const mongoose = require('mongoose');
+const { start } = require('repl');
 // bad-words will be imported dynamically
 
 const app = express();
@@ -15,9 +16,7 @@ const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});
+
 
 // --- Game Constants ---
 const GRID_SIZE = 20;
@@ -230,11 +229,19 @@ app.get('/api/leaderboard', async (req, res) => {
 // --- Main Server Initialization Function ---
 let filterInstance;
 
-async function initializeServer() {
+async function setupAsyncDependencies() { // Renamed for clarity
     try {
+        // 1. Connect to MongoDB
+        await mongoose.connect(MONGODB_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
+        console.log('Successfully connected to MongoDB!');
+
+        // 2. Initialize Profanity Filter
         const badWordsModule = await import('bad-words');
         const FilterClass = badWordsModule.default;
-        filterInstance = new FilterClass();
+        filterInstance = new FilterClass(); // Assign to the global-in-module variable
         console.log("Profanity filter initialized.");
 
         io.on('connection', (socket) => {
@@ -432,17 +439,49 @@ async function initializeServer() {
             });
         });
 
-        server.listen(PORT, () => {
-            console.log(`Server listening on port ${PORT}`);
-            resetBoardStatesOnly(); // Initial reset to create default board structures
-            console.log("Server ready. Initial board states created.");
-        });
+        
 
     } catch (err) {
-        console.error("Failed to initialize server or load profanity filter:", err);
-        process.exit(1);
+        console.error("Failed to setup async dependencies (MongoDB or Filter):", err);
+        process.exit(1); // Exit if critical dependencies fail
     }
 }
+
+function initializeSocketIoHandlers() {
+    io.on('connection', (socket) => {
+        console.log('User connected:', socket.id, "- Awaiting 'joinGame' with name.");
+        // Socket handlers are now initialized in setupAsyncDependencies
+        socket.on('joinGame', (data) => {
+            if (!filterInstance) {
+                console.error("Attempted to join game but profanity filter is not yet initialized.");
+                socket.emit('nameRejected', { message: 'Server is initializing. Please try again.' });
+                return;
+            }
+    });
+})};
+
+async function startServer() {
+    await setupAsyncDependencies(); // Wait for DB and filter setup
+    // Now that async dependencies are ready, set up Socket.IO handlers
+    initializeSocketIoHandlers();
+
+    // Setup Express routes and static files AFTER app is defined
+    app.use(express.static(path.join(__dirname, 'public')));
+    app.use(express.json());
+}
+
+server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+    resetBoardStatesOnly(); // Initial reset to create default board structures
+    console.log("Server ready. Initial board states created.");
+});
+
+startServer().catch(err => {
+    console.error("Error starting server:", err);
+    process.exit(1);
+});
+
+    
 
 async function savePlayerScore(playerName, score) {
     if (!playerName || typeof score !== 'number' || score < 0) {
@@ -596,7 +635,3 @@ function updateGameTick() {
     io.emit('gameState', currentBoardsWithNames);
 }
 
-initializeServer().catch(err => {
-    console.error("Unhandled error during server startup:", err);
-    process.exit(1);
-});
