@@ -376,7 +376,8 @@ function setupSocketEventHandlers() {
         if (restartButton) restartButton.style.display = 'none';
         if (countdownDisplayDiv) countdownDisplayDiv.classList.remove('visible');
 
-        updatePlayerNameDisplays(myPlayerId, localPlayerName);
+        // For 'init', the player themselves is never an AI
+        updatePlayerNameDisplays(myPlayerId, localPlayerName, false); 
 
         // --- MAKE SURE GAME AREA IS SHOWN ---
     if (gameAreaDiv) { // Assuming 'gameAreaDiv' is your main game container
@@ -483,7 +484,8 @@ function setupSocketEventHandlers() {
     socket.on('opponentNameUpdate', (data) => {
         console.log("Socket.IO: Opponent name update - ", data);
         if (data && data.playerId !== myPlayerId) {
-            updatePlayerNameDisplays(data.playerId, data.name);
+            // Use the isAi flag from the data, default to false if not provided
+            updatePlayerNameDisplays(data.playerId, data.name, !!data.isAi);
         }
     });
 
@@ -518,11 +520,16 @@ function setupSocketEventHandlers() {
             const scoreSpan = (playerId === 1) ? score1Span : score2Span;
             const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay;
 
+            const board = currentBoardsState[playerId]; // Use currentBoardsState which should now have isAi
+            const scoreSpan = (playerId === 1) ? score1Span : score2Span;
+            // const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay; // updatePlayerNameDisplays handles this
+
             if (board) {
                 if (scoreSpan) scoreSpan.textContent = board.score;
-                if (board.playerName && nameDisplay && nameDisplay.textContent !== board.playerName) {
-                    nameDisplay.textContent = board.playerName;
-                }
+                // Update name display using the helper function to ensure "(AI)" is appended if needed
+                // Only update if the name or AI status might have changed.
+                // The nameDisplay.textContent check inside updatePlayerNameDisplays will prevent redundant DOM updates.
+                updatePlayerNameDisplays(playerId, board.playerName, board.isAi);
 
                 if (!board.isGameOver && gameActiveForInput) {
                     updatePlayerStatusAndClass(playerId, "Playing", "playing");
@@ -551,15 +558,26 @@ function setupSocketEventHandlers() {
         let winnerDisplayName = "Unknown";
 
         if (winnerServerPlayerId !== 0 && currentBoardsState && currentBoardsState[winnerServerPlayerId]) {
-            winnerDisplayName = currentBoardsState[winnerServerPlayerId].playerName;
+            const winnerBoard = currentBoardsState[winnerServerPlayerId];
+            winnerDisplayName = winnerBoard.playerName + (winnerBoard.isAi ? " (AI)" : "");
         } else if (winnerServerPlayerId === 0) {
             winnerDisplayName = "Draw";
         }
 
         const loserId = winnerServerPlayerId === 1 ? 2 : (winnerServerPlayerId === 2 ? 1 : null);
+        let loserDisplayName = "";
+        if (loserId && currentBoardsState && currentBoardsState[loserId]) {
+            const loserBoard = currentBoardsState[loserId];
+            loserDisplayName = loserBoard.playerName + (loserBoard.isAi ? " (AI)" : "");
+        }
+
 
         if (data.reason === 'opponentLeft') {
-            message = `${winnerDisplayName} wins! (Opponent disconnected)`;
+            // Message construction for opponent left needs to be careful if the opponent was AI (though AI shouldn't "leave")
+            // Server-side, if AI is P2 and P1 leaves, AI is removed, game ends.
+            // If P1 leaves, P2 (human) wins.
+            const opponentWhoLeftName = loserDisplayName || `Player ${loserId}`; // Fallback if name not found
+            message = `${winnerDisplayName} wins! (${opponentWhoLeftName} disconnected)`;
             updatePlayerStatusAndClass(winnerServerPlayerId, "Winner!", "winner");
             if (loserId) updatePlayerStatusAndClass(loserId, "Disconnected", "disconnected");
         } else if (winnerServerPlayerId === 0) {
@@ -640,10 +658,13 @@ function setupSocketEventHandlers() {
 
 
 // --- Drawing Functions ---
-function updatePlayerNameDisplays(playerIdToUpdate, name) { // Helper function for name display
+function updatePlayerNameDisplays(playerIdToUpdate, name, isAi = false) { // Helper function for name display
     const nameDisplaySpan = (playerIdToUpdate === 1) ? p1NameDisplay : p2NameDisplay;
     if (nameDisplaySpan) {
-        nameDisplaySpan.textContent = name;
+        const displayName = name + (isAi ? " (AI)" : "");
+        if (nameDisplaySpan.textContent !== displayName) { // Only update if text actually changes
+            nameDisplaySpan.textContent = displayName;
+        }
     }
 }
 
