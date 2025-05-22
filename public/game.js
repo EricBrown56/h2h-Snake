@@ -5,7 +5,7 @@ const socket = io();
 let canvas1, ctx1, canvas2, ctx2;
 let statusDiv, score1Span, score2Span, p1StatusSpan, p2StatusSpan, youP1Span, youP2Span;
 let countdownDisplayDiv, restartButton;
-let playerNameModal, playerNameInput, submitNameButton, nameStatusMessage; // 'submitNameButton' will be our "Join Game" button
+let playerNameModal, playerNameInput, submitNameButton, playAiButton, nameStatusMessage; // Added playAiButton
 let leaderboardList, refreshLeaderboardButton; // Leaderboard is now a sidebar
 let p1NameDisplay, p2NameDisplay;
 let gameAreaDiv; // Main game area div
@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     playerNameModal = document.getElementById('playerNameModal');
     playerNameInput = document.getElementById('playerNameInput');
     submitNameButton = document.getElementById('submitNameButton'); // This button submits the name to join
+    playAiButton = document.getElementById('playAiButton'); // Get the new AI button
     nameStatusMessage = document.getElementById('nameStatusMessage');
 
     // Leaderboard elements (sidebar)
@@ -83,6 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
         submitNameButton.addEventListener('click', handleJoinGameAttempt);
     } else {
         console.error("Submit Name Button (for joining) not found!");
+    }
+
+    if (playAiButton) {
+        playAiButton.addEventListener('click', handlePlayAiRequest);
+    } else {
+        console.error("Play AI Button not found!");
     }
 
     if (refreshLeaderboardButton) {
@@ -242,6 +249,10 @@ function showPlayerNameModal(defaultName = '') {
             submitNameButton.disabled = false;
             submitNameButton.textContent = 'Join Game';
         }
+        if (playAiButton) { // Also reset AI button when modal is shown
+            playAiButton.disabled = false;
+            playAiButton.textContent = 'Play Solo vs AI';
+        }
         playerNameModal.classList.add('visible');
         if (playerNameInput) playerNameInput.focus();
         console.log("UI: Showing Player Name Modal");
@@ -261,9 +272,45 @@ function handleJoinGameAttempt() {
             playerNameInput.disabled = true;
             submitNameButton.disabled = true;
             submitNameButton.textContent = 'Joining...';
+            if (playAiButton) { // Disable AI button too
+                playAiButton.disabled = true;
+                playAiButton.textContent = 'Requesting...'; // Or keep as is, or "Joining..."
+            }
         } else {
             nameStatusMessage.textContent = 'Not connected to server. Please wait or refresh.';
             nameStatusMessage.className = 'name-status error';
+        }
+    } else {
+        nameStatusMessage.textContent = 'Name must be 2-15 characters.';
+        nameStatusMessage.className = 'name-status error';
+    }
+    playSound('click'); // Play sound on button click
+}
+
+function handlePlayAiRequest() {
+    if (!playerNameInput || !nameStatusMessage || !submitNameButton || !playAiButton) return;
+
+    const name = playerNameInput.value.trim();
+    if (name.length < 2 || name.length > 15) {
+        nameStatusMessage.textContent = 'Name must be 2-15 characters.';
+        nameStatusMessage.className = 'name-status error';
+        return;
+    }
+
+    if (socket && socket.connected) {
+        console.log("Client: Attempting to start AI game with name -", name);
+        socket.emit('requestAiGame', { name: name });
+        nameStatusMessage.textContent = "Requesting AI game...";
+        nameStatusMessage.className = 'name-status';
+        playerNameInput.disabled = true;
+        submitNameButton.disabled = true;
+        playAiButton.disabled = true;
+        submitNameButton.textContent = 'Requesting...'; // Keep consistent
+        playAiButton.textContent = 'Requesting...';
+        playSound('click');
+    } else {
+        nameStatusMessage.textContent = 'Not connected to server. Please wait or refresh.';
+        nameStatusMessage.className = 'name-status error';
         }
     } else {
         nameStatusMessage.textContent = 'Name must be 2-15 characters.';
@@ -368,6 +415,21 @@ function setupSocketEventHandlers() {
         [canvas1, canvas2].forEach(c => { if (c) { c.width = canvasWidth; c.height = canvasHeight; } });
 
         if (playerNameModal) playerNameModal.classList.remove('visible');
+        
+        // Re-enable buttons in case they were disabled and player is now successfully in game
+        // (e.g. after a disconnect and reconnect, or game end leading to new game)
+        // This is more of a fallback; showPlayerNameModal should handle reset if modal is shown.
+        // If modal is NOT shown (e.g. successful rejoin), these might not be needed here
+        // but doesn't hurt to ensure they are enabled if player is 'init'.
+        if (submitNameButton) {
+            submitNameButton.disabled = false;
+            submitNameButton.textContent = 'Join Game';
+        }
+        if (playAiButton) {
+            playAiButton.disabled = false;
+            playAiButton.textContent = 'Play Solo vs AI';
+        }
+
 
         updateStatus(`You are ${localPlayerName} (Player ${myPlayerId}). Waiting...`, true);
         if (youP1Span) youP1Span.style.display = (myPlayerId === 1) ? 'inline' : 'none';
@@ -403,6 +465,10 @@ function setupSocketEventHandlers() {
              submitNameButton.disabled = false;
              submitNameButton.textContent = 'Join Game';
         }
+        if (playAiButton) { // Also re-enable AI button on name rejection
+            playAiButton.disabled = false;
+            playAiButton.textContent = 'Play Solo vs AI';
+        }
     });
 
     socket.on('gameFull', (data) => {
@@ -416,6 +482,10 @@ function setupSocketEventHandlers() {
             if (submitNameButton) {
                  submitNameButton.disabled = true;
                  submitNameButton.textContent = 'Game Full';
+            }
+            if (playAiButton) { // Also disable AI button if game is full
+                playAiButton.disabled = true;
+                // playAiButton.textContent = 'Game Full'; // Optional text change
             }
         } else {
             updateStatus(data.message || 'Game is full. Please try again later.');
@@ -623,6 +693,10 @@ function setupSocketEventHandlers() {
             if(submitNameButton) {
                 submitNameButton.disabled = true;
                 submitNameButton.textContent = 'Game Full';
+            }
+            if (playAiButton) { // Also disable AI button when game is full (from this specific handler)
+                playAiButton.disabled = true;
+                // playAiButton.textContent = 'Game Full';
             }
         }
     });

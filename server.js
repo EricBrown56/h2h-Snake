@@ -28,7 +28,7 @@ const COUNTDOWN_SECONDS = 3;
 
 // --- AI Player Configuration ---
 const AI_PLAYER_NAME = "AI Snake";
-const AI_JOIN_TIMEOUT = 10000; // 10 seconds
+// AI_JOIN_TIMEOUT is removed
 
 // --- Game State Variables ---
 let players = {}; // { socketId: { playerId, name, color, socketId, isAi (optional) } }
@@ -40,7 +40,7 @@ let countdownInterval = null;
 let currentCountdown = COUNTDOWN_SECONDS;
 let gameActuallyRunning = false;
 let restartRequests = new Set();
-let aiJoinTimer = null; // Timer for AI to join
+// aiJoinTimer is removed
 
 // ****** NEW: For unique active player name tracking ******
 let activePlayerNames = new Set(); // Stores lowercase names of currently connected and playing users
@@ -338,30 +338,108 @@ async function setupAsyncDependencies() { // Renamed for clarity
                     });
                 }
 
+                // Logic for 'joinGame' is now for two human players
                 if (playerSockets[1] && playerSockets[2]) {
-                    console.log("Both players are now in. Initiating game sequence.");
-                    if (aiJoinTimer) { // Human player 2 joined, cancel AI timer
-                        clearTimeout(aiJoinTimer);
-                        aiJoinTimer = null;
-                        console.log("Human Player 2 joined, AI join timer cancelled.");
-                    }
+                    console.log("Both human players are now in. Initiating game sequence.");
                     initiateGameStartSequence();
-                } else if (assignedPlayerId === 1 && !playerSockets[2]) { // Player 1 joined, Player 2 is empty
-                    console.log(`Player ${playerName} is waiting for an opponent. Setting AI join timer.`);
+                } else if (assignedPlayerId === 1) { // Player 1 joined, waiting for Player 2
+                    console.log(`Player ${playerName} (P1) is waiting for a human opponent.`);
                     socket.emit('waiting');
                     io.emit('gameState', getBoardsWithPlayerNames());
+                } else { // Player 2 joined, P1 should already be there
+                    // This case is covered by the `playerSockets[1] && playerSockets[2]` check above
+                    // If P1 is not there, assignedPlayerId would have been 1.
+                    // So this 'else' implies P2 joined and P1 exists.
+                    // The initiateGameStartSequence will be called.
+                }
+            });
 
-                    if (aiJoinTimer) clearTimeout(aiJoinTimer); // Clear any existing timer
-                    aiJoinTimer = setTimeout(() => {
-                        if (playerSockets[1] && !playerSockets[2]) { // Check again if P1 still there and P2 still empty
-                            console.log("AI join timer expired. Creating AI player.");
-                            createAiPlayer();
+            socket.on('requestAiGame', (data) => {
+                console.log(`Socket ${socket.id} requested AI game with name: ${data ? data.name : 'undefined'}`);
+                if (!data || typeof data.name !== 'string') {
+                    socket.emit('nameRejected', { message: 'Invalid request data.' }); return;
+                }
+                const playerName = data.name.trim();
+                const playerNameLower = playerName.toLowerCase();
+
+                // Name Validation (same as joinGame)
+                if (!playerName || playerName.length < 2 || playerName.length > 15) {
+                    socket.emit('nameRejected', { message: 'Name must be 2-15 characters.' }); return;
+                }
+                if (!/^[a-zA-Z0-9_-\s]+$/.test(playerName)) {
+                    socket.emit('nameRejected', { message: 'Name contains invalid characters.' }); return;
+                }
+                try {
+                    if (filterInstance.isProfane(playerName)) {
+                        socket.emit('nameRejected', { message: 'Name contains inappropriate language.' }); return;
+                    }
+                } catch (e) {
+                    socket.emit('nameRejected', { message: 'Error validating name. Try another.' }); return;
+                }
+                if (activePlayerNames.has(playerNameLower)) {
+                    socket.emit('nameRejected', { message: `Name "${playerName}" is currently in use. Please choose another.` });
+                    return;
+                }
+
+                // Check if slots are available
+                if (playerSockets[1] || playerSockets[2]) {
+                    // Check if P1 slot is taken by this same user (e.g. a quick re-request)
+                    if (playerSockets[1] === socket.id && players[socket.id] && players[socket.id].name === playerName) {
+                        // If AI is already P2, maybe just resend init or ignore
+                        if (playerSockets[2] === 'ai_socket_id') {
+                             console.warn(`Player ${playerName} (${socket.id}) requested AI game again, already set up.`);
+                             socket.emit('init', { yourPlayerId: 1, gridSize: GRID_SIZE, cellSize: 20, yourName: playerName });
+                             io.to(socket.id).emit('opponentNameUpdate', { playerId: 2, name: AI_PLAYER_NAME, isAi: true });
+                             // Do not start sequence again if game might be running
+                             if (!gameActuallyRunning && !countdownInterval) {
+                                 initiateGameStartSequence();
+                             }
+                             return;
                         }
-                    }, AI_JOIN_TIMEOUT);
-                } else { // Should not happen if logic is correct (e.g. P2 joins before P1 - which is blocked by assignedPlayerId logic)
-                    console.log(`Player ${playerName} is waiting (unexpected state).`);
-                    socket.emit('waiting');
-                    io.emit('gameState', getBoardsWithPlayerNames());
+                    }
+                    // If P1 or P2 slots are taken by anyone else (human or AI)
+                    console.warn(`AI game request rejected: Player 1 slot taken by ${playerSockets[1]}, Player 2 slot by ${playerSockets[2]}`);
+                    socket.emit('gameFull', { message: 'Cannot start AI game, server busy or slots taken.' });
+                    return;
+                }
+
+                // Setup Player 1 (Human)
+                playerSockets[1] = socket.id;
+                players[socket.id] = {
+                    playerId: 1,
+                    color: 'green',
+                    name: playerName,
+                    socketId: socket.id,
+                    isAi: false
+                };
+                activePlayerNames.add(playerNameLower);
+                socket.playerName = playerName;
+                boards[1] = createNewBoardState(1, playerName);
+                boards[1].color = players[socket.id].color;
+                console.log(`Player 1 (${playerName}, ${socket.id}) joined for AI game.`);
+                socket.emit('init', {
+                    yourPlayerId: 1,
+                    gridSize: GRID_SIZE,
+                    cellSize: 20,
+                    yourName: playerName
+                });
+
+                // Create AI Player for Player 2 slot
+                createAiPlayer(); // This will set up P2 as AI
+
+                // Start the game
+                if (playerSockets[1] && playerSockets[2] === 'ai_socket_id') {
+                    console.log("Player 1 and AI ready. Initiating game sequence for AI game.");
+                    initiateGameStartSequence();
+                } else {
+                    // This should not happen if logic is correct
+                    console.error("Error setting up AI game: AI player not created correctly.");
+                    // Cleanup P1 if AI setup failed
+                    activePlayerNames.delete(playerNameLower);
+                    delete players[socket.id];
+                    playerSockets[1] = null;
+                    boards[1] = null;
+                    socket.emit('nameRejected', { message: 'Server error creating AI game.' }); // Or a generic error
                 }
             });
 
@@ -442,12 +520,12 @@ async function setupAsyncDependencies() { // Renamed for clarity
                     delete players[socket.id];
                     restartRequests.delete(playerId);
 
-                    // Clear AI join timer if Player 1 disconnects
-                    if (playerId === 1 && aiJoinTimer) {
-                        clearTimeout(aiJoinTimer);
-                        aiJoinTimer = null;
-                        console.log("Player 1 disconnected, AI join timer cancelled.");
-                    }
+                    // Clear AI join timer if Player 1 disconnects -- REMOVED as aiJoinTimer is removed
+                    // if (playerId === 1 && aiJoinTimer) {
+                    //     clearTimeout(aiJoinTimer);
+                    //     aiJoinTimer = null;
+                    //     console.log("Player 1 disconnected, AI join timer cancelled.");
+                    // }
 
                     const opponentId = playerId === 1 ? 2 : 1;
                     const opponentSocketId = playerSockets[opponentId];
@@ -747,30 +825,16 @@ function createAiPlayer() {
 
     console.log(`AI Player "${AI_PLAYER_NAME}" created for Player 2 slot.`);
 
-    // Notify Player 1 about their new AI opponent
+    // Notify Player 1 about their new AI opponent (if P1 exists)
     if (playerSockets[1] && players[playerSockets[1]]) {
         io.to(playerSockets[1]).emit('opponentNameUpdate', {
             playerId: 2,
             name: AI_PLAYER_NAME,
             isAi: true // AI player
         });
-        // Also send Player 1's name to the "game" (for display consistency, though AI doesn't see it)
-        // This isn't strictly necessary as AI doesn't have a client, but good for data consistency.
     }
-    
-    // Check if Player 1 is ready, then start game
-    if (playerSockets[1] && players[playerSockets[1]]) {
-        console.log("AI joined. Player 1 and AI are ready. Initiating game sequence.");
-        initiateGameStartSequence();
-    } else {
-        // This case should ideally not be hit if createAiPlayer is called only when P1 is present
-        console.warn("AI Player created, but Player 1 is missing. This shouldn't happen.");
-        // Clean up AI if P1 is not there, as game cannot start
-        playerSockets[2] = null;
-        delete players['ai_socket_id'];
-        activePlayerNames.delete(AI_PLAYER_NAME.toLowerCase());
-        boards[2] = createNewBoardState(2, 'Player 2');
-    }
+    // DO NOT call initiateGameStartSequence() here.
+    // The calling context (e.g., requestAiGame handler) is responsible for that.
 }
 
 function getAiNextMove(aiBoard, opponentBoard) {
