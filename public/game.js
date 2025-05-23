@@ -577,12 +577,18 @@ function setupSocketEventHandlers() {
 
         drawGame();
 
+        currentBoardsState = boardsData; // Ensure this assignment is correctly placed based on your file. Typically before drawGame().
+        drawGame(); // drawGame uses currentBoardsState
+
         [1, 2].forEach(playerId => {
-            const board = currentBoardsState[playerId]; 
-            const scoreSpan = (playerId === 1) ? score1Span : score2Span;
+            const board = currentBoardsState[playerId]; // Single declaration
+            const scoreSpan = (playerId === 1) ? score1Span : score2Span; // Single declaration
             
             if (board) {
-                if (scoreSpan) scoreSpan.textContent = board.score;
+                if (scoreSpan) {
+                    scoreSpan.textContent = board.score;
+                }
+                // updatePlayerNameDisplays handles the name, including AI tag
                 updatePlayerNameDisplays(playerId, board.playerName, board.isAi);
 
                 if (!board.isGameOver && gameActiveForInput) {
@@ -593,9 +599,13 @@ function setupSocketEventHandlers() {
                     updatePlayerStatusAndClass(playerId, "Waiting", "waiting");
                 }
             } else {
-                if (scoreSpan) scoreSpan.textContent = '0';
+                // This is the block that handles if board is null (e.g. player not joined)
+                if (scoreSpan) {
+                    scoreSpan.textContent = '0';
+                }
                 updatePlayerStatusAndClass(playerId, "Waiting", "waiting");
-                updatePlayerNameDisplays(playerId, `Player ${playerId}`, false);
+                // If board is null, there's no board.playerName or board.isAi, so pass default/generic values
+                updatePlayerNameDisplays(playerId, `Player ${playerId}`, false); 
                 const CtxToClear = playerId === 1 ? ctx1 : ctx2;
                 if(CtxToClear) clearCanvas(CtxToClear);
             }
