@@ -145,10 +145,10 @@ function playSound(soundName) {
     if (isMuted || !sounds[soundName]) return; 
     if (sounds[soundName].paused || sounds[soundName].ended) {
         sounds[soundName].currentTime = 0; 
-        sounds[soundName].play().catch(error => console.warn('Error playing sound \${soundName}:', error));
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (boo):`, error));
     } else {
         sounds[soundName].currentTime = 0; 
-        sounds[soundName].play().catch(error => console.warn(`Error playing sound \${soundName} (restarting):`, error));
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (restarting):`, error));
     }
 } 
 
@@ -156,7 +156,7 @@ function playMusic(musicName) {
     if (isMuted || !sounds[musicName]) return; 
     if (sounds[musicName].paused) {
         sounds[musicName].currentTime = 0; 
-        sounds[musicName].play().catch(error => console.warn(`Error playing music \${musicName}:`, error));
+        sounds[musicName].play().catch(error => console.warn(`Error playing music ${musicName}:`, error));
     }
 }
 
@@ -326,7 +326,7 @@ async function fetchAndShowLeaderboard() {
     try {
         const response = await fetch('/api/leaderboard');
         if (!response.ok) {
-            throw new Error(`HTTP error! status: \${response.status}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         const scores = await response.json();
         renderLeaderboard(scores);
@@ -430,7 +430,7 @@ function setupSocketEventHandlers() {
         }
 
 
-        updateStatus(`You are \${localPlayerName} (Player \${myPlayerId}). Waiting...`, true);
+        updateStatus(`You are ${localPlayerName} (Player ${myPlayerId}). Waiting...`, true);
         if (youP1Span) youP1Span.style.display = (myPlayerId === 1) ? 'inline' : 'none';
         if (youP2Span) youP2Span.style.display = (myPlayerId === 2) ? 'inline' : 'none';
         gameActiveForInput = false;
@@ -449,7 +449,7 @@ function setupSocketEventHandlers() {
     }
     // --- END ---
 
-    updateStatus(`You are \${localPlayerName} (Player \${myPlayerId}). Waiting for opponent...`, true);
+    updateStatus(`You are ${localPlayerName} (Player ${myPlayerId}). Waiting for opponent...`, true);
 
     });
 
@@ -496,7 +496,7 @@ function setupSocketEventHandlers() {
         myPlayerId = data.yourPlayerId;
         localPlayerName = data.yourName;
         if (playerNameModal) playerNameModal.classList.remove('visible');
-        updateStatus(`Rejoined as \${localPlayerName}. Server will sync state.`);
+        updateStatus(`Rejoined as ${localPlayerName}. Server will sync state.`);
     });
 
     socket.on('waiting', () => {
@@ -506,14 +506,14 @@ function setupSocketEventHandlers() {
             showPlayerNameModal();
             return;
         }
-        updateStatus(`Waiting for opponent to join, \${localPlayerName}...`, true);
+        updateStatus(`Waiting for opponent to join, ${localPlayerName}...`, true);
         gameActiveForInput = false;
         if (restartButton) restartButton.style.display = 'none';
         if (myPlayerId) updatePlayerStatusAndClass(myPlayerId, "Waiting", "waiting");
 
         const opponentId = myPlayerId === 1 ? 2 : 1;
         if (!currentBoardsState || !currentBoardsState[opponentId]) {
-             updatePlayerNameDisplays(opponentId, `Player \${opponentId}`);
+             updatePlayerNameDisplays(opponentId, `Player ${opponentId}`);
              updatePlayerStatusAndClass(opponentId, "Waiting", "waiting");
              const opponentCtx = opponentId === 1 ? ctx1 : ctx2;
              if (opponentCtx) clearCanvas(opponentCtx);
@@ -540,7 +540,7 @@ function setupSocketEventHandlers() {
             countdownDisplayDiv.classList.add('visible');
         }
         if (typeof count === 'number' && count > 0) {
-            updateStatus(`Game starting in \${count}...`);
+            updateStatus(`Game starting in ${count}...`);
             playSound('count'); // Play tick sound for numbers 3, 2, 1
         } else if (count === 'GO!') {
             updateStatus('GO!');
@@ -628,7 +628,7 @@ function setupSocketEventHandlers() {
 
         if (data.reason === 'opponentLeft') {
             const opponentWhoLeftName = loserDisplayName || `Player ${loserId}`; 
-            message = `\${winnerDisplayName} wins! (${opponentWhoLeftName} disconnected)`;
+            message = `${winnerDisplayName} wins! (${opponentWhoLeftName} disconnected)`;
             updatePlayerStatusAndClass(winnerServerPlayerId, "Winner!", "winner");
             if (loserId) updatePlayerStatusAndClass(loserId, "Disconnected", "disconnected");
         } else if (winnerServerPlayerId === 0) {
@@ -636,7 +636,7 @@ function setupSocketEventHandlers() {
             updatePlayerStatusAndClass(1, "Draw", "draw");
             updatePlayerStatusAndClass(2, "Draw", "draw");
         } else {
-            message += `\${winnerDisplayName} wins!`;
+            message += `${winnerDisplayName} wins!`;
             updatePlayerStatusAndClass(winnerServerPlayerId, "Winner!", "winner");
             if (loserId) updatePlayerStatusAndClass(loserId, "Lost", "lost");
         }
@@ -850,7 +850,7 @@ function drawBoard(playerId, boardState, context) {
 
 // --- Keyboard Input Handler ---
 function handleKeyPress(event) {
-    // console.log(\`Key Press: \${event.key}, gameActiveForInput: \${gameActiveForInput}, myPlayerId: \${myPlayerId}, boardExists: \${!!(currentBoardsState && currentBoardsState[myPlayerId])}, isGameOver: \${currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'}\`)
+    // console.log(`Key Press: ${event.key}, gameActiveForInput: ${gameActiveForInput}, myPlayerId: ${myPlayerId}, boardExists: ${!!(currentBoardsState && currentBoardsState[myPlayerId])}, isGameOver: ${currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'}`)
     if (!gameActiveForInput || !myPlayerId || !currentBoardsState || !currentBoardsState[myPlayerId] || currentBoardsState[myPlayerId].isGameOver) {
         return;
     }
