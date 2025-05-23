@@ -397,7 +397,7 @@ canvas {
     #leaderboardSidebar h2 {font-size: 1.3em;}
     .player-board-container {
         padding: 15px;
-    }
+    }}
 /* Game Legend Styles */
 #gameLegend {
     margin-top: 15px;
@@ -438,5 +438,4 @@ canvas {
 .legend-text {
     font-size: 0.9em;
     vertical-align: middle;
-}
 }
