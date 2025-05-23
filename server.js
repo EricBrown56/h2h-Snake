@@ -655,14 +655,32 @@ async function savePlayerScore(playerName, score) {
         console.warn(`Not saving score for ${playerName} with score ${score} (invalid name/score).`);
         return;
     }
-    // No need to check for highest score here; the API query handles that.
-    // We save all game scores, which could be useful for other stats later.
+
     try {
-        const newScoreEntry = new Score({ playerName, score });
-        await newScoreEntry.save();
-        console.log(`Score saved for ${playerName}: ${score}`);
+        // Find the existing high score for this player
+        const existingHighScore = await Score.findOne({ playerName: playerName })
+                                             .sort({ score: -1 }) // Sort by score descending
+                                             .exec();
+
+        if (existingHighScore) {
+            // A score exists, check if the new score is higher
+            if (score > existingHighScore.score) {
+                // New score is higher, save it as a new entry
+                const newScoreEntry = new Score({ playerName, score });
+                await newScoreEntry.save();
+                console.log(`New high score saved for ${playerName}: ${score}`);
+            } else {
+                // New score is not higher, do not save
+                console.log(`Score for ${playerName} (${score}) is not higher than existing high score (${existingHighScore.score}). Not saving.`);
+            }
+        } else {
+            // No existing score found for this player, save the new score
+            const newScoreEntry = new Score({ playerName, score });
+            await newScoreEntry.save();
+            console.log(`First score saved for ${playerName}: ${score}`);
+        }
     } catch (error) {
-        console.error(`Error saving score for ${playerName}:`, error.message);
+        console.error(`Error in savePlayerScore for ${playerName}:`, error.message);
     }
 }
 

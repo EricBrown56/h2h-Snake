@@ -141,18 +141,16 @@ function loadSounds() {
     console.log("Sounds loaded.");
 }
 
-function playSound(soundName) { 
-    if (isMuted || sounds[soundName]) return; // Don't play if muted or sound not found
+function playSound(soundName) {
+    if (isMuted || !sounds[soundName]) return;
+
     if (sounds[soundName].paused || sounds[soundName].ended) {
-        sounds[soundName].currentTime = 0; // Reset to start
-        console.log(`Sound: ${soundName}, Paused: ${sounds[soundName].paused}, 
-            Ended: ${sounds[soundName].ended}, currentTime: ${sounds[soundName].currentTime}, src: ${sounds[soundName].src}`);
+        sounds[soundName].currentTime = 0;
+        // console.log(`Sound: ${soundName}, Paused: ${sounds[soundName].paused}, Ended: ${sounds[soundName].ended}, currentTime: ${sounds[soundName].currentTime}, src: ${sounds[soundName].src}`);
         sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
     } else {
-        sounds[soundName].currentTime = 0; // Reset to start
-        console.log(`Sound: ${soundName}, Paused: ${sounds[soundName].paused}, 
-            Ended: ${sounds[soundName].ended}, currentTime: ${sounds[soundName].currentTime}, src: ${sounds[soundName].src}`);
-        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
+        sounds[soundName].currentTime = 0;
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (restarting):`, error));
     }
 } 
 
@@ -539,7 +537,7 @@ function setupSocketEventHandlers() {
         }
         if (typeof count === 'number' && count > 0) {
             updateStatus(`Game starting in ${count}...`);
-            playSound('count'); // Play tick sound for numbers 3, 2, 1
+            playSound('countdown'); // Play tick sound for numbers 3, 2, 1
         } else if (count === 'GO!') {
             updateStatus('GO!');
             playSound('go');            // Play "GO!" sound
