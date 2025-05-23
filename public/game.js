@@ -587,8 +587,8 @@ function setupSocketEventHandlers() {
             const scoreSpan = (playerId === 1) ? score1Span : score2Span;
             const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay;
 
-            const board = currentBoardsState[playerId]; // Use currentBoardsState which should now have isAi
-            const scoreSpan = (playerId === 1) ? score1Span : score2Span;
+            //const board = currentBoardsState[playerId]; // Use currentBoardsState which should now have isAi
+            //const scoreSpan = (playerId === 1) ? score1Span : score2Span;
             // const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay; // updatePlayerNameDisplays handles this
 
             if (board) {
