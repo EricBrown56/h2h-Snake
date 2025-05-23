@@ -141,13 +141,13 @@ function loadSounds() {
     console.log("Sounds loaded.");
 }
 
-function playSound(soundName) { 
-    if (isMuted || !sounds[soundName]) return; 
+function playSound(soundName) {
+    if (isMuted || !sounds[soundName]) return; // Corrected logic: !sounds[soundName]
     if (sounds[soundName].paused || sounds[soundName].ended) {
-        sounds[soundName].currentTime = 0; 
-        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (boo):`, error));
+        sounds[soundName].currentTime = 0;
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
     } else {
-        sounds[soundName].currentTime = 0; 
+        sounds[soundName].currentTime = 0;
         sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (restarting):`, error));
     }
 } 

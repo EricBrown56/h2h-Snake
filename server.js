@@ -668,12 +668,12 @@ async function savePlayerScore(playerName, score) {
 
 function updateGameTick() {
     if (!gameActuallyRunning || !playerSockets[1] || !players[playerSockets[1]] || !playerSockets[2] || !players[playerSockets[2]]) {
-        if(gameActuallyRunning) { // If it somehow gets here while gameActuallyRunning is true
+        if(gameActuallyRunning) {
             console.warn("Game tick: Inconsistent state - game set as running but players missing. Stopping.");
             clearAllIntervalsAndRequests();
             if (playerSockets[1] && players[playerSockets[1]]) io.to(playerSockets[1]).emit('waiting');
-            // Check if playerSockets[2] is not 'ai_socket_id' before emitting waiting to it
-            if (playerSockets[2] && players[playerSockets[2]] && playerSockets[2] !== 'ai_socket_id') {
+            const p2Info = players[playerSockets[2]];
+            if (p2Info && !p2Info.isAi) {
                  io.to(playerSockets[2]).emit('waiting');
             }
             resetBoardStatesOnly(true);
@@ -682,14 +682,10 @@ function updateGameTick() {
         return;
     }
 
-    // --- AI Player Move Decision ---
-    // Check if Player 2 is an AI and the game is running for them
-    // Ensure playerSockets[2] maps to an existing player object that has 'isAi' property
     const player2Object = players[playerSockets[2]];
     if (player2Object?.isAi && boards[2] && !boards[2].isGameOver) {
-        const aiMove = getAiNextMove(boards[2], boards[1]); // Pass AI's board and opponent's board (P1)
+        const aiMove = getAiNextMove(boards[2], boards[1]);
         if (aiMove) {
-            // console.log(\`AI performing move: \${aiMove}\`); // Optional: for debugging AI moves
             boards[2].direction = aiMove;
             switch (aiMove) {
                 case 'up':    boards[2].dx = 0; boards[2].dy = -1; break;
@@ -699,43 +695,35 @@ function updateGameTick() {
             }
         }
     }
-    // --- End AI Player Move Decision ---
 
     let gameShouldEnd = false;
-
     [1, 2].forEach(playerId => {
         if (!boards[playerId] || boards[playerId].isGameOver) return;
-
         const board = boards[playerId];
-        // Player direction (dx, dy) should already be set (by client for human, by AI logic for AI)
         const currentHead = { ...board.snake[0] };
         const nextHead = { x: currentHead.x + board.dx, y: currentHead.y + board.dy };
 
-        // Wall collision
         if (nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE) {
             board.isGameOver = true; gameShouldEnd = true;
             const playerSocketId = playerSockets[playerId];
-            // Do not emit 'gameOver' to AI socket
-            if (playerSocketId && playerSocketId !== 'ai_socket_id') {
+            const pInfo = players[playerSocketId];
+            if (pInfo && !pInfo.isAi) {
                 io.to(playerSocketId).emit('gameOver', { winnerId: playerId === 1 ? 2 : 1, reason: 'wallCollision' });
-            } else if (playerSocketId === 'ai_socket_id') { // AI hit a wall
-                // If AI (P2) hits a wall, P1 wins. Notify P1.
+            } else if (pInfo?.isAi) {
                 if(playerSockets[1] && players[playerSockets[1]]) {
                     io.to(playerSockets[1]).emit('gameOver', { winnerId: 1, reason: 'opponentWallCollision' });
                 }
             }
             return;
         }
-        // Self collision
         for (let i = 0; i < board.snake.length; i++) {
             if (nextHead.x === board.snake[i].x && nextHead.y === board.snake[i].y) {
                 board.isGameOver = true; gameShouldEnd = true;
                 const playerSocketId = playerSockets[playerId];
-                 // Do not emit 'gameOver' to AI socket directly for its own self-collision in the same way
-                if (playerSocketId && playerSocketId !== 'ai_socket_id') {
+                const pInfo = players[playerSocketId];
+                if (pInfo && !pInfo.isAi) {
                     io.to(playerSocketId).emit('gameOver', { winnerId: playerId === 1 ? 2 : 1, reason: 'selfCollision' });
-                } else if (playerSocketId === 'ai_socket_id') { // AI self-collided
-                    // If AI (P2) self-collided, P1 wins. Notify P1.
+                } else if (pInfo?.isAi) {
                      if(playerSockets[1] && players[playerSockets[1]]) {
                         io.to(playerSockets[1]).emit('gameOver', { winnerId: 1, reason: 'opponentSelfCollision' });
                     }
@@ -743,26 +731,23 @@ function updateGameTick() {
                 return;
             }
         }
-        // if (board.isGameOver) return; // This was redundant
 
         let ateFood = false;
         let justShrunkByDebuff = false;
-
         if (nextHead.x === board.food.x && nextHead.y === board.food.y) {
             ateFood = true;
             board.score += 10;
             board.foodEatenCounter++;
             board.food = getRandomPosition([...board.snake, board.food, ...(board.debuffs || []), ...(board.powerups || [])]);
-
             const playerSocketId = playerSockets[playerId];
-            if (playerSocketId && playerSocketId !== 'ai_socket_id') { // Don't send playSound to AI
+            const pInfo = players[playerSocketId];
+            if (pInfo && !pInfo.isAi) {
                 io.to(playerSocketId).emit('playSound', 'eatFood');
-            } else if (playerSocketId === 'ai_socket_id') { // If AI ate food, notify human player
+            } else if (pInfo?.isAi) {
                  if(playerSockets[1] && players[playerSockets[1]]) {
-                    io.to(playerSockets[1]).emit('playSound', 'eatFood'); // Let P1 hear AI eating
+                    io.to(playerSockets[1]).emit('playSound', 'eatFood');
                  }
             }
-
             if (board.foodEatenCounter >= DEBUFF_TRIGGER_COUNT) {
                 board.foodEatenCounter = 0;
                 const opponentId = playerId === 1 ? 2 : 1;
@@ -784,11 +769,12 @@ function updateGameTick() {
             }
             justShrunkByDebuff = true;
             const playerSocketId = playerSockets[playerId];
-            if (playerSocketId && playerSocketId !== 'ai_socket_id') {
-                io.to(playerSocketId).emit('playSound', 'debuffPickup');
-            } else if (playerSocketId === 'ai_socket_id') {
+            const pInfo = players[playerSocketId];
+            if (pInfo && !pInfo.isAi) {
+                io.to(playerSocketId).emit('playSound', 'debuff'); // Corrected sound name
+            } else if (pInfo?.isAi) {
                 if(playerSockets[1] && players[playerSockets[1]]) {
-                    io.to(playerSockets[1]).emit('playSound', 'debuffPickup'); // Let P1 hear AI pickup
+                    io.to(playerSockets[1]).emit('playSound', 'debuff'); // Corrected sound name for P1
                 }
             }
         }
@@ -800,52 +786,34 @@ function updateGameTick() {
             } else if (board.snake.length > 1 && board.score === 0) {
                  board.snake.pop();
             }
-        } else if (justShrunkByDebuff && board.snake.length === 0) { // Check after unshift if shrunk to nothing
+        } else if (justShrunkByDebuff && board.snake.length === 0) {
             board.isGameOver = true; gameShouldEnd = true;
         }
-
-        if (board.snake.length === 0) { // Double check, e.g. if started at MIN_SNAKE_LENGTH and shrunk
-            board.isGameOver = true;
-            gameShouldEnd = true;
+        if (board.snake.length === 0) {
+            board.isGameOver = true; gameShouldEnd = true;
         }
-
-    }); // End of forEach player loop
+    });
 
     const currentBoardsWithNames = getBoardsWithPlayerNames();
-
-    if (gameShouldEnd || (boards[1] && boards[1].isGameOver) || (boards[2] && boards[2].isGameOver)) {
+    if (gameShouldEnd || (boards[1]?.isGameOver) || (boards[2]?.isGameOver)) {
         clearAllIntervalsAndRequests();
         gameActuallyRunning = false;
-
         const p1 = boards[1];
         const p2 = boards[2];
         let winnerId = null;
-
-        if (p1 && p1.isGameOver && p2 && p2.isGameOver) winnerId = 0; // Draw
-        else if (p1 && p1.isGameOver) winnerId = 2; // P2 wins
-        else if (p2 && p2.isGameOver) winnerId = 1; // P1 wins
-        else {
-             console.error("updateGameTick: gameShouldEnd true, but no loser identified clearly.");
-             winnerId = 0;
-        }
-
+        if (p1?.isGameOver && p2?.isGameOver) winnerId = 0;
+        else if (p1?.isGameOver) winnerId = 2;
+        else if (p2?.isGameOver) winnerId = 1;
+        else { winnerId = 0; }
         console.log(`Game Over! Winner: ${winnerId === 0 ? "Draw" : (currentBoardsWithNames[winnerId]?.playerName || `Player ${winnerId}`)}`);
-
-        // Save human player scores
         if (playerSockets[1] && players[playerSockets[1]] && p1) {
             savePlayerScore(players[playerSockets[1]].name, p1.score);
         }
-        // Only save P2 score if P2 is not AI, or if you want to save AI scores
-        const player2Info = players[playerSockets[2]];
-        if (player2Info && !player2Info.isAi && p2) {
-            savePlayerScore(player2Info.name, p2.score);
-        } else if (player2Info && player2Info.isAi && p2) {
-            // console.log(\`AI (\${player2Info.name}) final score: \${p2.score}. Not saving to leaderboard.\`);
-            // Optionally save AI score if desired, but typically not for leaderboards
-            // savePlayerScore(player2Info.name, p2.score);
+        const player2InfoObject = players[playerSockets[2]]; // Renamed to avoid conflict
+        if (player2InfoObject && !player2InfoObject.isAi && p2) {
+            savePlayerScore(player2InfoObject.name, p2.score);
         }
-
-        io.emit('gameOver', { winnerId: winnerId, reason: boards[1]?.isGameOver && boards[2]?.isGameOver ? 'draw' : 'collision' });
+        io.emit('gameOver', { winnerId: winnerId, reason: (p1?.isGameOver && p2?.isGameOver) ? 'draw' : 'collision' });
     }
     io.emit('gameState', currentBoardsWithNames);
 }
@@ -886,15 +854,14 @@ function createAiPlayer() {
 
 function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not used but kept for signature
     if (!aiBoard || !aiBoard.snake || aiBoard.snake.length === 0) {
-        // console.log("AI: Invalid board or snake.");
-        return aiBoard.direction || 'right'; // Fallback if no snake
+        return aiBoard.direction || 'right';
     }
 
     const head = { ...aiBoard.snake[0] };
     const snake = aiBoard.snake;
     const food = aiBoard.food;
     const currentDirection = aiBoard.direction;
-    const gridSize = GRID_SIZE; // Assuming GRID_SIZE is accessible
+    const gridSize = GRID_SIZE;
 
     const allDirections = [
         { name: 'up', dx: 0, dy: -1 },
@@ -904,25 +871,17 @@ function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not u
     ];
 
     let level1SafeMoves = [];
-
-    // Filter 1: Basic Validity (No reversal, no immediate wall/self collision)
     for (const dir of allDirections) {
-        // Prevent immediate reversal
         if ((currentDirection === 'up' && dir.name === 'down') ||
             (currentDirection === 'down' && dir.name === 'up') ||
             (currentDirection === 'left' && dir.name === 'right') ||
             (currentDirection === 'right' && dir.name === 'left')) {
             continue;
         }
-
         const nextHead = { x: head.x + dir.dx, y: head.y + dir.dy };
-
-        // Wall collision
         if (nextHead.x < 0 || nextHead.x >= gridSize || nextHead.y < 0 || nextHead.y >= gridSize) {
             continue;
         }
-
-        // Self collision
         let selfCollision = false;
         for (let i = 0; i < snake.length; i++) {
             if (nextHead.x === snake[i].x && nextHead.y === snake[i].y) {
@@ -937,50 +896,37 @@ function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not u
     }
 
     if (level1SafeMoves.length === 0) {
-        // console.log("AI: No Level 1 Safe Moves. Emergency!");
-        return currentDirection || 'right'; // Simplistic emergency fallback
+        return currentDirection || 'right';
     }
 
     let level2SafeMoves = [];
-    // Filter 2: Lookahead Safety (Wall Trap & Self-Trap)
     for (const dir of level1SafeMoves) {
         const nextHead = { x: head.x + dir.dx, y: head.y + dir.dy };
         let isWallTrap = false;
         let isSelfTrap = false;
 
-        // Check for Wall Trap (if next move is towards a wall and then further leads to collision)
-        const furtherHead = { x: nextHead.x + dir.dx, y: nextHead.y + dir.dy };
-        if (furtherHead.x < 0 || furtherHead.x >= gridSize || furtherHead.y < 0 || furtherHead.y >= gridSize) {
-            // Check if this wall collision is due to being on the edge and moving further into it
-            if ((nextHead.x === 0 && dir.dx === -1) || 
-                (nextHead.x === gridSize - 1 && dir.dx === 1) || 
-                (nextHead.y === 0 && dir.dy === -1) || 
-                (nextHead.y === gridSize - 1 && dir.dy === 1)) {
-                isWallTrap = true;
+        // Refined Wall Trap Check: considers if food is the target
+        if (!(nextHead.x === food.x && nextHead.y === food.y)) {
+            const furtherHead = { x: nextHead.x + dir.dx, y: nextHead.y + dir.dy };
+            if (furtherHead.x < 0 || furtherHead.x >= gridSize || furtherHead.y < 0 || furtherHead.y >= gridSize) {
+                 // If the move 'dir' takes snake to 'nextHead', and then applying 'dir' again from 'nextHead' leads to 'furtherHead' being a wall.
+                 isWallTrap = true;
             }
         }
 
-        // Check for Self Trap (2 steps ahead)
-        // Simulate making the move `dir`
-        // Create a hypothetical snake state *as if* the move `dir` was made
-        const snakeAfterMove1 = [{...nextHead}, ...snake.slice(0, snake.length -1)]; 
+        const snakeAfterMove1 = [{...nextHead}, ...snake.slice(0, snake.length -1)];
         let canMakeSecondMove = false;
         for (const nextDir of allDirections) {
-            // Prevent reversal from the new direction `dir.name`
             if ((dir.name === 'up' && nextDir.name === 'down') ||
                 (dir.name === 'down' && nextDir.name === 'up') ||
                 (dir.name === 'left' && nextDir.name === 'right') ||
                 (dir.name === 'right' && nextDir.name === 'left')) {
                 continue;
             }
-
             const headAfterMove2 = { x: nextHead.x + nextDir.dx, y: nextHead.y + nextDir.dy };
-
-            // Wall collision for 2nd move
             if (headAfterMove2.x < 0 || headAfterMove2.x >= gridSize || headAfterMove2.y < 0 || headAfterMove2.y >= gridSize) {
                 continue;
             }
-            // Self collision for 2nd move (with snakeAfterMove1)
             let selfCollisionMove2 = false;
             for (let i = 0; i < snakeAfterMove1.length; i++) {
                 if (headAfterMove2.x === snakeAfterMove1[i].x && headAfterMove2.y === snakeAfterMove1[i].y) {
@@ -989,7 +935,7 @@ function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not u
                 }
             }
             if (!selfCollisionMove2) {
-                canMakeSecondMove = true; // Found at least one safe second move
+                canMakeSecondMove = true;
                 break;
             }
         }
@@ -1001,32 +947,26 @@ function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not u
             level2SafeMoves.push(dir);
         }
     }
-    
+
     let bestMovesToConsider = [];
     if (level2SafeMoves.length > 0) {
         bestMovesToConsider = level2SafeMoves;
-        // console.log("AI: Using Level 2 Safe Moves:", bestMovesToConsider.map(d => d.name));
     } else if (level1SafeMoves.length > 0) {
-        bestMovesToConsider = level1SafeMoves; // Fallback to L1 if L2 are all traps
-        // console.log("AI: No Level 2 Safe Moves, falling back to Level 1:", bestMovesToConsider.map(d => d.name));
+        bestMovesToConsider = level1SafeMoves;
     } else {
-        // console.log("AI: Critically trapped, emergency direction.");
-        return currentDirection || 'right'; // Should have been caught by earlier L1 check
+        return currentDirection || 'right';
     }
 
-    // Target food among the chosen set of safe moves (L2 preferred, else L1)
     let finalChoice = null;
     let minDistanceToFood = Infinity;
 
     for (const dir of bestMovesToConsider) {
         const pHead = { x: head.x + dir.dx, y: head.y + dir.dy };
         const distance = Math.abs(pHead.x - food.x) + Math.abs(pHead.y - food.y);
-
         if (distance < minDistanceToFood) {
             minDistanceToFood = distance;
             finalChoice = dir.name;
         } else if (distance === minDistanceToFood) {
-            // Prefer current direction if it's equally good and part of bestMovesToConsider
             if (dir.name === currentDirection) {
                 finalChoice = dir.name;
             }
@@ -1034,18 +974,12 @@ function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not u
     }
 
     if (!finalChoice) {
-        // If no move strictly reduces distance, or multiple are equal & currentDir not among them.
-        // Prioritize current direction if it's in bestMovesToConsider.
         if (bestMovesToConsider.some(d => d.name === currentDirection)) {
             finalChoice = currentDirection;
         } else {
-            // Fallback: Pick the first from bestMovesToConsider as a deterministic choice.
-            // A better heuristic here could be "move with most open space" but that's more complex.
             finalChoice = bestMovesToConsider[0].name;
         }
     }
-    
-    //console.log(`AI: Chosen move: ${finalChoice} (L1: ${level1SafeMoves.map(d=>d.name)}, L2: ${level2SafeMoves.map(d=>d.name)})`);
     return finalChoice;
 }
 
