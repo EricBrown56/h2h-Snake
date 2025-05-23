@@ -142,24 +142,20 @@ function loadSounds() {
 }
 
 function playSound(soundName) { 
-    if (isMuted || sounds[soundName]) return; // Don't play if muted or sound not found
+    if (isMuted || !sounds[soundName]) return; 
     if (sounds[soundName].paused || sounds[soundName].ended) {
-        sounds[soundName].currentTime = 0; // Reset to start
-        console.log(`Sound: ${soundName}, Paused: ${sounds[soundName].paused}, 
-            Ended: ${sounds[soundName].ended}, currentTime: ${sounds[soundName].currentTime}, src: ${sounds[soundName].src}`);
-        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
+        sounds[soundName].currentTime = 0; 
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (boo):`, error));
     } else {
-        sounds[soundName].currentTime = 0; // Reset to start
-        console.log(`Sound: ${soundName}, Paused: ${sounds[soundName].paused}, 
-            Ended: ${sounds[soundName].ended}, currentTime: ${sounds[soundName].currentTime}, src: ${sounds[soundName].src}`);
-        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName}:`, error));
+        sounds[soundName].currentTime = 0; 
+        sounds[soundName].play().catch(error => console.warn(`Error playing sound ${soundName} (restarting):`, error));
     }
 } 
 
 function playMusic(musicName) {
-    if (isMuted || !sounds[musicName]) return; // Don't play if muted or sound not found
+    if (isMuted || !sounds[musicName]) return; 
     if (sounds[musicName].paused) {
-        sounds[musicName].currentTime = 0; // Reset to start
+        sounds[musicName].currentTime = 0; 
         sounds[musicName].play().catch(error => console.warn(`Error playing music ${musicName}:`, error));
     }
 }
@@ -167,25 +163,25 @@ function playMusic(musicName) {
 function stopMusic(musicName) {
     if (sounds[musicName]) {
         sounds[musicName].pause();
-        sounds[musicName].currentTime = 0; // Reset to start
+        sounds[musicName].currentTime = 0; 
     }
 }
 
 function stopAllSoundsAndMusic() {
     for (const key in sounds) {
-        if (sounds[key]) {
+        if (sounds[key] && typeof sounds[key].pause === 'function') { 
             sounds[key].pause();
-            sounds[key].currentTime = 0; // Reset to start
+            sounds[key].currentTime = 0; 
         }
     }
 }
 
 function toggleMuteAllSounds() {
-    isMuted = !isMuted; // Toggle mute state
+    isMuted = !isMuted; 
     if (isMuted) {
-        stopAllSoundsAndMusic(); // Stop all sounds and music
+        stopAllSoundsAndMusic(); 
     } else {
-        playMusic('backgroundMusic'); // Play background music if unmuted
+        playMusic('backgroundMusic'); 
     }
     console.log("Sound muted:", isMuted);
     updateMuteButtonVisuals();
@@ -249,7 +245,7 @@ function showPlayerNameModal(defaultName = '') {
             submitNameButton.disabled = false;
             submitNameButton.textContent = 'Join Game';
         }
-        if (playAiButton) { // Also reset AI button when modal is shown
+        if (playAiButton) {
             playAiButton.disabled = false;
             playAiButton.textContent = 'Play Solo vs AI';
         }
@@ -260,14 +256,17 @@ function showPlayerNameModal(defaultName = '') {
 }
 
 function handleJoinGameAttempt() {
-    console.log('Socket connected:', socket.connected); // Added for debugging
-    if (!playerNameInput || !nameStatusMessage || !submitNameButton) return;
+    console.log('Socket connected:', socket.connected);
+    if (!playerNameInput || !nameStatusMessage || !submitNameButton) {
+        console.error("Modal elements not found for join game attempt.");
+        return;
+    }
 
     const name = playerNameInput.value.trim();
     if (name.length >= 2 && name.length <= 15) {
         if (socket && socket.connected) {
             console.log("Client: Attempting to join with name -", name);
-            playSound('click'); // Play sound on successful validation and connection
+            playSound('click');
             socket.emit('joinGame', { name: name });
             nameStatusMessage.textContent = "Attempting to join...";
             nameStatusMessage.className = 'name-status';
@@ -276,7 +275,7 @@ function handleJoinGameAttempt() {
             submitNameButton.textContent = 'Joining...';
             if (playAiButton) {
                 playAiButton.disabled = true;
-                playAiButton.textContent = 'Requesting...'; // Or a consistent "Joining..."
+                playAiButton.textContent = 'Joining...'; // Consistent with submitNameButton
             }
         } else {
             nameStatusMessage.textContent = 'Not connected to server. Please wait or refresh.';
@@ -289,19 +288,22 @@ function handleJoinGameAttempt() {
 }
 
 function handlePlayAiRequest() {
-    console.log('Socket connected:', socket.connected); // Added for debugging
-    if (!playerNameInput || !nameStatusMessage || !submitNameButton || !playAiButton) return;
+    console.log('Socket connected:', socket.connected);
+    if (!playerNameInput || !nameStatusMessage || !submitNameButton || !playAiButton) {
+        console.error("Modal elements not found for AI request.");
+        return;
+    }
 
     const name = playerNameInput.value.trim();
     if (name.length < 2 || name.length > 15) {
         nameStatusMessage.textContent = 'Name must be 2-15 characters.';
         nameStatusMessage.className = 'name-status error';
-        return; // Exit if name is invalid
+        return;
     }
 
     if (socket && socket.connected) {
         console.log("Client: Attempting to start AI game with name -", name);
-        playSound('click'); // Play sound on successful validation and connection
+        playSound('click');
         socket.emit('requestAiGame', { name: name });
         nameStatusMessage.textContent = "Requesting AI game...";
         nameStatusMessage.className = 'name-status';
@@ -558,44 +560,29 @@ function setupSocketEventHandlers() {
 
     socket.on('gameState', (boardsData) => {
         if (!myPlayerId) {
-            console.log("Socket.IO: Received gameState but client not initialized. Ignoring.");
+            // console.log("Socket.IO: Received gameState but client not initialized. Ignoring."); // Can be noisy
             return;
         }
-        console.log("Socket.IO: Received game state:", boardsData);
-        currentBoardsState = boardsData;
-
-        if (myPlayerId && currentBoardsState && currentBoardsState[myPlayerId] && boardsData && boardsData[myPlayerId]) {
-            const oldPlayerBoard = currentBoardsState[myPlayerId];
-            const newPlayerBoard = boardsData[myPlayerId];
-
-            // Food eaten sound
-            if (newPlayerBoard.score > oldPlayerBoard.score && newPlayerBoard.snake.length >= oldPlayerBoard.snake.length) {
-                playSound('eatFood');
-            }
-            // Debuff pickup sound
-            if (oldPlayerBoard.debuffs && newPlayerBoard.debuffs && newPlayerBoard.debuffs.length < oldPlayerBoard.debuffs.length) {
-                playSound('debuffPickup');
-            }
+        // console.log("Socket.IO: Received game state:", boardsData); // Too noisy for regular play
+        
+        // Sound logic based on comparison (if currentBoardsState is reliable and different from boardsData)
+        // This comparison logic needs currentBoardsState to be the state *before* this update.
+        if (myPlayerId && currentBoardsState && currentBoardsState[myPlayerId] && boardsData[myPlayerId]) {
+            // const oldPlayerBoard = currentBoardsState[myPlayerId]; // This was problematic as currentBoardsState was already updated
+            // const newPlayerBoard = boardsData[myPlayerId];
+            // Server now sends playSound events for eatFood and debuffPickup
         }
 
-        currentBoardsState = boardsData;
+        currentBoardsState = boardsData; // Update after potential comparison
 
         drawGame();
 
         [1, 2].forEach(playerId => {
-            const board = currentBoardsState[playerId];
+            const board = currentBoardsState[playerId]; 
             const scoreSpan = (playerId === 1) ? score1Span : score2Span;
-            const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay;
-
-            //const board = currentBoardsState[playerId]; // Use currentBoardsState which should now have isAi
-            //const scoreSpan = (playerId === 1) ? score1Span : score2Span;
-            // const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay; // updatePlayerNameDisplays handles this
-
+            
             if (board) {
                 if (scoreSpan) scoreSpan.textContent = board.score;
-                // Update name display using the helper function to ensure "(AI)" is appended if needed
-                // Only update if the name or AI status might have changed.
-                // The nameDisplay.textContent check inside updatePlayerNameDisplays will prevent redundant DOM updates.
                 updatePlayerNameDisplays(playerId, board.playerName, board.isAi);
 
                 if (!board.isGameOver && gameActiveForInput) {
@@ -608,7 +595,7 @@ function setupSocketEventHandlers() {
             } else {
                 if (scoreSpan) scoreSpan.textContent = '0';
                 updatePlayerStatusAndClass(playerId, "Waiting", "waiting");
-                if (nameDisplay) nameDisplay.textContent = `Player ${playerId}`;
+                updatePlayerNameDisplays(playerId, `Player ${playerId}`, false);
                 const CtxToClear = playerId === 1 ? ctx1 : ctx2;
                 if(CtxToClear) clearCanvas(CtxToClear);
             }
@@ -640,10 +627,7 @@ function setupSocketEventHandlers() {
 
 
         if (data.reason === 'opponentLeft') {
-            // Message construction for opponent left needs to be careful if the opponent was AI (though AI shouldn't "leave")
-            // Server-side, if AI is P2 and P1 leaves, AI is removed, game ends.
-            // If P1 leaves, P2 (human) wins.
-            const opponentWhoLeftName = loserDisplayName || `Player ${loserId}`; // Fallback if name not found
+            const opponentWhoLeftName = loserDisplayName || `Player ${loserId}`; 
             message = `${winnerDisplayName} wins! (${opponentWhoLeftName} disconnected)`;
             updatePlayerStatusAndClass(winnerServerPlayerId, "Winner!", "winner");
             if (loserId) updatePlayerStatusAndClass(loserId, "Disconnected", "disconnected");
@@ -679,11 +663,11 @@ function setupSocketEventHandlers() {
             }
         }, 1500);
 
-        stopMusic('backgroundMusic'); // Stop background music on game over
-        playSound('gameOver'); // Play game over sound
+        stopMusic('backgroundMusic'); 
+        playSound('gameOver'); 
     });
 
-    socket.on('gameFull', (data) => { // Expects data.message
+    socket.on('gameFull', (data) => { 
         updateStatus(data.message || 'Game is full. Please try again later.');
         if (playerNameModal && playerNameModal.classList.contains('visible')) {
             if(nameStatusMessage) nameStatusMessage.textContent = data.message || 'Game is full. Try later.';
@@ -691,7 +675,7 @@ function setupSocketEventHandlers() {
                 submitNameButton.disabled = true;
                 submitNameButton.textContent = 'Game Full';
             }
-            if (playAiButton) { // Also disable AI button when game is full (from this specific handler)
+            if (playAiButton) { 
                 playAiButton.disabled = true;
                 // playAiButton.textContent = 'Game Full';
             }
@@ -718,7 +702,6 @@ function setupSocketEventHandlers() {
     });
 
     socket.on('playSound', (soundName) => {
-        // Play sound on client side from server request
         if (sounds[soundName]) {
             playSound(soundName);
         } else {
@@ -729,11 +712,11 @@ function setupSocketEventHandlers() {
 
 
 // --- Drawing Functions ---
-function updatePlayerNameDisplays(playerIdToUpdate, name, isAi = false) { // Helper function for name display
+function updatePlayerNameDisplays(playerIdToUpdate, name, isAi = false) { 
     const nameDisplaySpan = (playerIdToUpdate === 1) ? p1NameDisplay : p2NameDisplay;
     if (nameDisplaySpan) {
         const displayName = name + (isAi ? " (AI)" : "");
-        if (nameDisplaySpan.textContent !== displayName) { // Only update if text actually changes
+        if (nameDisplaySpan.textContent !== displayName) { 
             nameDisplaySpan.textContent = displayName;
         }
     }
@@ -755,75 +738,59 @@ function drawGame() {
 
 function drawBoard(playerId, boardState, context) {
     if (!context || !boardState) return;
-    clearCanvas(context); // Assuming clearCanvas is defined and works
+    clearCanvas(context); 
 
-    const radius = cellSize / 2; // Radius for full-cell circles
+    const radius = cellSize / 2; 
 
     // --- Draw Food (as a circle) ---
     if (boardState.food) {
-        context.fillStyle = 'red'; // Food color
+        context.fillStyle = 'red'; 
         context.beginPath();
         context.arc(
-            boardState.food.x * cellSize + radius, // center x
-            boardState.food.y * cellSize + radius, // center y
-            radius,                                // circle radius
-            0,                                     // startAngle
-            2 * Math.PI                            // endAngle (full circle)
+            boardState.food.x * cellSize + radius, 
+            boardState.food.y * cellSize + radius, 
+            radius,                                
+            0,                                     
+            2 * Math.PI                            
         );
         context.fill();
     }
 
     // --- Draw Debuffs (keeping them as smaller squares for now, or change to circles if desired) ---
     if (boardState.debuffs) {
-        context.fillStyle = 'purple'; // Debuff color
+        context.fillStyle = 'purple'; 
         boardState.debuffs.forEach(debuff => {
-            // Original square debuff:
             context.fillRect(debuff.x * cellSize + cellSize * 0.15, debuff.y * cellSize + cellSize * 0.15, cellSize * 0.7, cellSize * 0.7);
-            
-            // If you want circular debuffs (optional):
-            // const debuffRadius = (cellSize * 0.7) / 2;
-            // context.beginPath();
-            // context.arc(
-            //     debuff.x * cellSize + radius, // center x (same as full cell for simplicity here)
-            //     debuff.y * cellSize + radius, // center y
-            //     debuffRadius,
-            //     0,
-            //     2 * Math.PI
-            // );
-            // context.fill();
         });
     }
 
     // --- Draw Snake (as circles) ---
     if (boardState.snake) {
-        context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue'); // Snake color
-        context.strokeStyle = '#111'; // Outline color for segments
-        context.lineWidth = 1;         // Outline width
+        context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue'); 
+        context.strokeStyle = '#111'; 
+        context.lineWidth = 1;         
 
         boardState.snake.forEach((segment, index) => {
-            // Draw segment body
             context.beginPath();
             context.arc(
-                segment.x * cellSize + radius, // center x
-                segment.y * cellSize + radius, // center y
-                radius,                        // segment radius
+                segment.x * cellSize + radius, 
+                segment.y * cellSize + radius, 
+                radius,                        
                 0,
                 2 * Math.PI
             );
             context.fill();
-            if (context.lineWidth > 0) { // Only draw stroke if lineWidth is set
-                context.stroke(); // Outline for the segment
+            if (context.lineWidth > 0) { 
+                context.stroke(); 
             }
 
             // --- Draw Eyes on the Head (as circles) ---
-            if (index === 0 && boardState.direction) { // If it's the head segment
-                context.fillStyle = '#FFF'; // Eye color (white)
-                const eyeSize = Math.max(1, Math.floor(cellSize / 4.5)); // Radius of the eye
-                let eye1X, eye1Y, eye2X, eye2Y; // Positions for two eyes
+            if (index === 0 && boardState.direction) { 
+                context.fillStyle = '#FFF'; 
+                const eyeSize = Math.max(1, Math.floor(cellSize / 4.5)); 
+                let eye1X, eye1Y, eye2X, eye2Y; 
 
-                // Calculate eye positions based on direction (more distinct two eyes look)
-                // These positions are relative to the center of the head segment
-                const offsetAmount = radius * 0.45; // How far from center eyes are
+                const offsetAmount = radius * 0.45; 
 
                 switch (boardState.direction.toUpperCase()) {
                     case 'UP':
@@ -850,21 +817,18 @@ function drawBoard(playerId, boardState, context) {
                         eye2X = segment.x * cellSize + radius + offsetAmount * 0.5;
                         eye2Y = segment.y * cellSize + radius + offsetAmount;
                         break;
-                    default: // Should not happen if direction is always set
+                    default: 
                         return;
                 }
 
-                // Draw first eye
                 context.beginPath();
                 context.arc(eye1X, eye1Y, eyeSize, 0, 2 * Math.PI);
                 context.fill();
 
-                // Draw second eye
                 context.beginPath();
                 context.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
                 context.fill();
 
-                // Reset fillStyle to snake color for next segments
                 context.fillStyle = boardState.color || (playerId === 1 ? 'green' : 'blue');
             }
         });
@@ -872,64 +836,48 @@ function drawBoard(playerId, boardState, context) {
 
     // --- Draw Game Over Overlay ---
     if (boardState.isGameOver) {
-        context.fillStyle = 'rgba(26, 26, 46, 0.75)'; // Dark overlay
-        context.fillRect(0, 0, canvasWidth, canvasHeight); // Assuming canvasWidth/Height are available
-        context.fillStyle = '#e94560'; // Accent text color
+        context.fillStyle = 'rgba(26, 26, 46, 0.75)'; 
+        context.fillRect(0, 0, canvasWidth, canvasHeight); 
+        context.fillStyle = '#e94560'; 
         const bodyFont = getComputedStyle(document.body).fontFamily.split(',')[0].trim() || 'sans-serif';
-        context.font = `bold ${Math.max(24, Math.floor(cellSize * 1.5))}px ${bodyFont}`;
+        context.font = `bold' ${Math.max(24, Math.floor(cellSize * 1.5))}px ${bodyFont}`;
         context.textAlign = 'center';
         context.shadowColor = 'black'; context.shadowBlur = 5;
         context.fillText('GAME OVER', canvasWidth / 2, canvasHeight / 2);
-        context.shadowBlur = 0; // Reset shadow
+        context.shadowBlur = 0; 
     }
 }
 
 // --- Keyboard Input Handler ---
-// --- Keyboard Input Handler ---
 function handleKeyPress(event) {
-    console.log(`Key Press: ${event.key}, gameActiveForInput: ${gameActiveForInput}, myPlayerId: ${myPlayerId}, boardExists: ${!!(currentBoardsState && currentBoardsState[myPlayerId])}, isGameOver: ${currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'}`)
-    // Check if input should be processed:
-    // 1. Is the game active for input? (e.g., not in countdown, not game over)
-    // 2. Does the client have a player ID?
-    // 3. Is there a current board state for this player?
-    // 4. Is this player's game NOT over?
+    // console.log(`Key Press: ${event.key}, gameActiveForInput: ${gameActiveForInput}, myPlayerId: ${myPlayerId}, boardExists: ${!!(currentBoardsState && currentBoardsState[myPlayerId])}, isGameOver: ${currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'}`)
     if (!gameActiveForInput || !myPlayerId || !currentBoardsState || !currentBoardsState[myPlayerId] || currentBoardsState[myPlayerId].isGameOver) {
-        // Optional: Log why input is being ignored, can be helpful for debugging
-        // console.log("Key press ignored. Conditions:", {
-        //     gameActiveForInput,
-        //     myPlayerId,
-        //     hasBoardState: !!(currentBoardsState && currentBoardsState[myPlayerId]),
-        //     isGameOver: currentBoardsState && currentBoardsState[myPlayerId] ? currentBoardsState[myPlayerId].isGameOver : 'N/A'
-        // });
         return;
     }
 
     let direction = null;
-    // Use toUpperCase() for matching the event.key, but assign the lowercase string for the server
     switch (event.key.toUpperCase()) {
         case 'W':
         case 'ARROWUP':
-            direction = 'up'; // Changed to lowercase
+            direction = 'up'; 
             break;
         case 'S':
         case 'ARROWDOWN':
-            direction = 'down'; // Changed to lowercase
+            direction = 'down'; 
             break;
         case 'A':
         case 'ARROWLEFT':
-            direction = 'left'; // Changed to lowercase
+            direction = 'left'; 
             break;
         case 'D':
         case 'ARROWRIGHT':
-            direction = 'right'; // Changed to lowercase
+            direction = 'right'; 
             break;
         default:
-            // Not a movement key we care about
             return;
     }
 
     if (direction) {
-        // console.log(`Client: Emitting directionChange '${direction}' for player ${myPlayerId}`); // For debugging
         socket.emit('directionChange', direction);
     }
 }
