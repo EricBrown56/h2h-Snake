@@ -28,7 +28,7 @@ const COUNTDOWN_SECONDS = 3;
 
 // --- AI Player Configuration ---
 const AI_PLAYER_NAME = "AI Snake";
-// AI_JOIN_TIMEOUT is removed
+// AI_JOIN_TIMEOUT is removed ---
 
 // --- Game State Variables ---
 let players = {}; // { socketId: { playerId, name, color, socketId, isAi (optional) } }
