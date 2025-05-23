@@ -5,7 +5,7 @@ const socket = io();
 let canvas1, ctx1, canvas2, ctx2;
 let statusDiv, score1Span, score2Span, p1StatusSpan, p2StatusSpan, youP1Span, youP2Span;
 let countdownDisplayDiv, restartButton;
-let playerNameModal, playerNameInput, submitNameButton, nameStatusMessage; // 'submitNameButton' will be our "Join Game" button
+let playerNameModal, playerNameInput, submitNameButton, playAiButton, nameStatusMessage; // Added playAiButton
 let leaderboardList, refreshLeaderboardButton; // Leaderboard is now a sidebar
 let p1NameDisplay, p2NameDisplay;
 let gameAreaDiv; // Main game area div
@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     playerNameModal = document.getElementById('playerNameModal');
     playerNameInput = document.getElementById('playerNameInput');
     submitNameButton = document.getElementById('submitNameButton'); // This button submits the name to join
+    playAiButton = document.getElementById('playAiButton'); // Get the new AI button
     nameStatusMessage = document.getElementById('nameStatusMessage');
 
     // Leaderboard elements (sidebar)
@@ -83,6 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
         submitNameButton.addEventListener('click', handleJoinGameAttempt);
     } else {
         console.error("Submit Name Button (for joining) not found!");
+    }
+
+    if (playAiButton) {
+        playAiButton.addEventListener('click', handlePlayAiRequest);
+    } else {
+        console.error("Play AI Button not found!");
     }
 
     if (refreshLeaderboardButton) {
@@ -242,6 +249,10 @@ function showPlayerNameModal(defaultName = '') {
             submitNameButton.disabled = false;
             submitNameButton.textContent = 'Join Game';
         }
+        if (playAiButton) { // Also reset AI button when modal is shown
+            playAiButton.disabled = false;
+            playAiButton.textContent = 'Play Solo vs AI';
+        }
         playerNameModal.classList.add('visible');
         if (playerNameInput) playerNameInput.focus();
         console.log("UI: Showing Player Name Modal");
@@ -249,18 +260,24 @@ function showPlayerNameModal(defaultName = '') {
 }
 
 function handleJoinGameAttempt() {
+    console.log('Socket connected:', socket.connected); // Added for debugging
     if (!playerNameInput || !nameStatusMessage || !submitNameButton) return;
 
     const name = playerNameInput.value.trim();
     if (name.length >= 2 && name.length <= 15) {
         if (socket && socket.connected) {
             console.log("Client: Attempting to join with name -", name);
+            playSound('click'); // Play sound on successful validation and connection
             socket.emit('joinGame', { name: name });
             nameStatusMessage.textContent = "Attempting to join...";
             nameStatusMessage.className = 'name-status';
             playerNameInput.disabled = true;
             submitNameButton.disabled = true;
             submitNameButton.textContent = 'Joining...';
+            if (playAiButton) {
+                playAiButton.disabled = true;
+                playAiButton.textContent = 'Requesting...'; // Or a consistent "Joining..."
+            }
         } else {
             nameStatusMessage.textContent = 'Not connected to server. Please wait or refresh.';
             nameStatusMessage.className = 'name-status error';
@@ -269,7 +286,34 @@ function handleJoinGameAttempt() {
         nameStatusMessage.textContent = 'Name must be 2-15 characters.';
         nameStatusMessage.className = 'name-status error';
     }
-    playSound('click'); // Play sound on button click
+}
+
+function handlePlayAiRequest() {
+    console.log('Socket connected:', socket.connected); // Added for debugging
+    if (!playerNameInput || !nameStatusMessage || !submitNameButton || !playAiButton) return;
+
+    const name = playerNameInput.value.trim();
+    if (name.length < 2 || name.length > 15) {
+        nameStatusMessage.textContent = 'Name must be 2-15 characters.';
+        nameStatusMessage.className = 'name-status error';
+        return; // Exit if name is invalid
+    }
+
+    if (socket && socket.connected) {
+        console.log("Client: Attempting to start AI game with name -", name);
+        playSound('click'); // Play sound on successful validation and connection
+        socket.emit('requestAiGame', { name: name });
+        nameStatusMessage.textContent = "Requesting AI game...";
+        nameStatusMessage.className = 'name-status';
+        playerNameInput.disabled = true;
+        submitNameButton.disabled = true;
+        playAiButton.disabled = true;
+        submitNameButton.textContent = 'Requesting...';
+        playAiButton.textContent = 'Requesting...';
+    } else {
+        nameStatusMessage.textContent = 'Not connected to server. Please wait or refresh.';
+        nameStatusMessage.className = 'name-status error';
+    }
 }
 
 // --- Leaderboard Functions ---
@@ -368,6 +412,21 @@ function setupSocketEventHandlers() {
         [canvas1, canvas2].forEach(c => { if (c) { c.width = canvasWidth; c.height = canvasHeight; } });
 
         if (playerNameModal) playerNameModal.classList.remove('visible');
+        
+        // Re-enable buttons in case they were disabled and player is now successfully in game
+        // (e.g. after a disconnect and reconnect, or game end leading to new game)
+        // This is more of a fallback; showPlayerNameModal should handle reset if modal is shown.
+        // If modal is NOT shown (e.g. successful rejoin), these might not be needed here
+        // but doesn't hurt to ensure they are enabled if player is 'init'.
+        if (submitNameButton) {
+            submitNameButton.disabled = false;
+            submitNameButton.textContent = 'Join Game';
+        }
+        if (playAiButton) {
+            playAiButton.disabled = false;
+            playAiButton.textContent = 'Play Solo vs AI';
+        }
+
 
         updateStatus(`You are ${localPlayerName} (Player ${myPlayerId}). Waiting...`, true);
         if (youP1Span) youP1Span.style.display = (myPlayerId === 1) ? 'inline' : 'none';
@@ -376,7 +435,8 @@ function setupSocketEventHandlers() {
         if (restartButton) restartButton.style.display = 'none';
         if (countdownDisplayDiv) countdownDisplayDiv.classList.remove('visible');
 
-        updatePlayerNameDisplays(myPlayerId, localPlayerName);
+        // For 'init', the player themselves is never an AI
+        updatePlayerNameDisplays(myPlayerId, localPlayerName, false); 
 
         // --- MAKE SURE GAME AREA IS SHOWN ---
     if (gameAreaDiv) { // Assuming 'gameAreaDiv' is your main game container
@@ -402,6 +462,10 @@ function setupSocketEventHandlers() {
              submitNameButton.disabled = false;
              submitNameButton.textContent = 'Join Game';
         }
+        if (playAiButton) { // Also re-enable AI button on name rejection
+            playAiButton.disabled = false;
+            playAiButton.textContent = 'Play Solo vs AI';
+        }
     });
 
     socket.on('gameFull', (data) => {
@@ -415,6 +479,10 @@ function setupSocketEventHandlers() {
             if (submitNameButton) {
                  submitNameButton.disabled = true;
                  submitNameButton.textContent = 'Game Full';
+            }
+            if (playAiButton) { // Also disable AI button if game is full
+                playAiButton.disabled = true;
+                // playAiButton.textContent = 'Game Full'; // Optional text change
             }
         } else {
             updateStatus(data.message || 'Game is full. Please try again later.');
@@ -483,7 +551,8 @@ function setupSocketEventHandlers() {
     socket.on('opponentNameUpdate', (data) => {
         console.log("Socket.IO: Opponent name update - ", data);
         if (data && data.playerId !== myPlayerId) {
-            updatePlayerNameDisplays(data.playerId, data.name);
+            // Use the isAi flag from the data, default to false if not provided
+            updatePlayerNameDisplays(data.playerId, data.name, !!data.isAi);
         }
     });
 
@@ -518,11 +587,16 @@ function setupSocketEventHandlers() {
             const scoreSpan = (playerId === 1) ? score1Span : score2Span;
             const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay;
 
+            const board = currentBoardsState[playerId]; // Use currentBoardsState which should now have isAi
+            const scoreSpan = (playerId === 1) ? score1Span : score2Span;
+            // const nameDisplay = (playerId === 1) ? p1NameDisplay : p2NameDisplay; // updatePlayerNameDisplays handles this
+
             if (board) {
                 if (scoreSpan) scoreSpan.textContent = board.score;
-                if (board.playerName && nameDisplay && nameDisplay.textContent !== board.playerName) {
-                    nameDisplay.textContent = board.playerName;
-                }
+                // Update name display using the helper function to ensure "(AI)" is appended if needed
+                // Only update if the name or AI status might have changed.
+                // The nameDisplay.textContent check inside updatePlayerNameDisplays will prevent redundant DOM updates.
+                updatePlayerNameDisplays(playerId, board.playerName, board.isAi);
 
                 if (!board.isGameOver && gameActiveForInput) {
                     updatePlayerStatusAndClass(playerId, "Playing", "playing");
@@ -551,15 +625,26 @@ function setupSocketEventHandlers() {
         let winnerDisplayName = "Unknown";
 
         if (winnerServerPlayerId !== 0 && currentBoardsState && currentBoardsState[winnerServerPlayerId]) {
-            winnerDisplayName = currentBoardsState[winnerServerPlayerId].playerName;
+            const winnerBoard = currentBoardsState[winnerServerPlayerId];
+            winnerDisplayName = winnerBoard.playerName + (winnerBoard.isAi ? " (AI)" : "");
         } else if (winnerServerPlayerId === 0) {
             winnerDisplayName = "Draw";
         }
 
         const loserId = winnerServerPlayerId === 1 ? 2 : (winnerServerPlayerId === 2 ? 1 : null);
+        let loserDisplayName = "";
+        if (loserId && currentBoardsState && currentBoardsState[loserId]) {
+            const loserBoard = currentBoardsState[loserId];
+            loserDisplayName = loserBoard.playerName + (loserBoard.isAi ? " (AI)" : "");
+        }
+
 
         if (data.reason === 'opponentLeft') {
-            message = `${winnerDisplayName} wins! (Opponent disconnected)`;
+            // Message construction for opponent left needs to be careful if the opponent was AI (though AI shouldn't "leave")
+            // Server-side, if AI is P2 and P1 leaves, AI is removed, game ends.
+            // If P1 leaves, P2 (human) wins.
+            const opponentWhoLeftName = loserDisplayName || `Player ${loserId}`; // Fallback if name not found
+            message = `${winnerDisplayName} wins! (${opponentWhoLeftName} disconnected)`;
             updatePlayerStatusAndClass(winnerServerPlayerId, "Winner!", "winner");
             if (loserId) updatePlayerStatusAndClass(loserId, "Disconnected", "disconnected");
         } else if (winnerServerPlayerId === 0) {
@@ -606,6 +691,10 @@ function setupSocketEventHandlers() {
                 submitNameButton.disabled = true;
                 submitNameButton.textContent = 'Game Full';
             }
+            if (playAiButton) { // Also disable AI button when game is full (from this specific handler)
+                playAiButton.disabled = true;
+                // playAiButton.textContent = 'Game Full';
+            }
         }
     });
 
@@ -640,10 +729,13 @@ function setupSocketEventHandlers() {
 
 
 // --- Drawing Functions ---
-function updatePlayerNameDisplays(playerIdToUpdate, name) { // Helper function for name display
+function updatePlayerNameDisplays(playerIdToUpdate, name, isAi = false) { // Helper function for name display
     const nameDisplaySpan = (playerIdToUpdate === 1) ? p1NameDisplay : p2NameDisplay;
     if (nameDisplaySpan) {
-        nameDisplaySpan.textContent = name;
+        const displayName = name + (isAi ? " (AI)" : "");
+        if (nameDisplaySpan.textContent !== displayName) { // Only update if text actually changes
+            nameDisplaySpan.textContent = displayName;
+        }
     }
 }
 
