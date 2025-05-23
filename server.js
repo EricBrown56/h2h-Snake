@@ -1045,7 +1045,7 @@ function getAiNextMove(aiBoard, opponentBoard) { // opponentBoard is still not u
         }
     }
     
-    console.log(`AI: Chosen move: ${finalChoice} (L1: ${level1SafeMoves.map(d=>d.name)}, L2: ${level2SafeMoves.map(d=>d.name)})`);
+    //console.log(`AI: Chosen move: ${finalChoice} (L1: ${level1SafeMoves.map(d=>d.name)}, L2: ${level2SafeMoves.map(d=>d.name)})`);
     return finalChoice;
 }
 
